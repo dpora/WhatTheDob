@@ -11,20 +11,18 @@ namespace WhatTheDob.API
     {
         private static readonly HttpClient _client = new HttpClient();
 
-        public async Task<string> GetMenuDataAsync(string url, string menuDate, string meal, string campus)
+        public async Task<string> GetMenuDataAsync(string url, string menuDate, string meal, int campusId)
         {
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
+            //Build the POST request
+            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url);
+            request.Content = new StringContent($"selMenuDate={menuDate}&selMeal={meal}&selCampus={campusId}");
+            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded");
 
-            var data = new FormUrlEncodedContent(new[]
-            {
-                new KeyValuePair<string, string>("selMenuDate", menuDate),
-                new KeyValuePair<string, string>("selMeal", meal),
-                new KeyValuePair<string, string>("selCampus", campus),
-            });
-
-            var response = await _client.PostAsync(url, data);
+            //Send the request
+            HttpResponseMessage response = await _client.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
+            //Return the response content as a string
             return await response.Content.ReadAsStringAsync();
         }
     }

@@ -1,4 +1,6 @@
-﻿namespace WhatTheDob.API.entities
+﻿using System.Collections.Generic;
+
+namespace WhatTheDob.Core.Entities
 {
     public class Menu
     {

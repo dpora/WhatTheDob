@@ -1,13 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Net.Http;
+﻿using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
+using WhatTheDob.Core.Services.External;
 
-namespace WhatTheDob.API
+namespace WhatTheDob.Infrastructure.Services.External
 {
-    public class MenuApiCaller
+    public class MenuApiClient : IMenuApiClient
     {
         private static readonly HttpClient _client = new HttpClient();
 

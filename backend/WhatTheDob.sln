@@ -3,11 +3,11 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.14.36623.8
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.API", "WhatTheDob.API.csproj", "{0C32852B-F616-DE02-693B-200FCC049D4C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.API", ".\src\WhatTheDob.API\WhatTheDob.API.csproj", "{0C32852B-F616-DE02-693B-200FCC049D4C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Core", "..\WhatTheDob.Core\WhatTheDob.Core.csproj", "{0B5CB424-C7FB-4C6A-9ED8-923D5DCDB92E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Core", ".\src\WhatTheDob.Core\WhatTheDob.Core.csproj", "{0B5CB424-C7FB-4C6A-9ED8-923D5DCDB92E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Infrastructure", "..\WhatTheDob.Infrastructure\WhatTheDob.Infrastructure.csproj", "{7B1EFD74-0FE9-43E3-8E00-A0A0188252B6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Infrastructure", ".\src\WhatTheDob.Infrastructure\WhatTheDob.Infrastructure.csproj", "{7B1EFD74-0FE9-43E3-8E00-A0A0188252B6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

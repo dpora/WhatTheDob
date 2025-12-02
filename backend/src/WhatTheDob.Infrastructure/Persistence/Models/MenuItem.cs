@@ -14,8 +14,7 @@ public partial class MenuItem
     public int RatingTotal { get; set; }
 
     public int RatingCount { get; set; }
+    
+    public virtual ICollection<ItemCategoryMapping> ItemCategoryMappings { get; set; } = new List<ItemCategoryMapping>();
 
-    public int CategoryId { get; set; }
-
-    public virtual Category Category { get; set; } = null!;
 }

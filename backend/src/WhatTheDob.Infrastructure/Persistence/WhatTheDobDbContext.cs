@@ -26,10 +26,7 @@ public partial class WhatTheDobDbContext : DbContext
     public virtual DbSet<MenuItem> MenuItems { get; set; }
 
     public virtual DbSet<MenuMapping> MenuMappings { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlite("Data Source=C:\\Users\\jenwh\\source\\repos\\WhatTheDob\\datastorage\\WhatTheDob.db");
+    public virtual DbSet<ItemCategoryMapping> ItemCategoryMappings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -78,18 +75,11 @@ public partial class WhatTheDobDbContext : DbContext
             entity.ToTable("MenuItem");
 
             entity.Property(e => e.Id).HasColumnName("ID");
-            entity.Property(e => e.CategoryId).HasColumnName("CategoryID");
-
-            entity.HasOne(d => d.Category).WithMany(p => p.MenuItems)
-                .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
         modelBuilder.Entity<MenuMapping>(entity =>
         {
-            entity
-                .HasNoKey()
-                .ToTable("MenuMapping");
+            entity.ToTable("MenuMapping");
 
             entity.Property(e => e.Id).HasColumnName("ID");
             entity.Property(e => e.MenuId).HasColumnName("MenuID");
@@ -103,6 +93,24 @@ public partial class WhatTheDobDbContext : DbContext
                 .HasForeignKey(d => d.MenuItemId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
+
+        modelBuilder.Entity<ItemCategoryMapping>(entity =>
+        {
+            entity.ToTable("ItemCategoryMapping");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.CategoryId).HasColumnName("CategoryID");
+            entity.Property(e => e.MenuItemId).HasColumnName("MenuItemID");
+
+            entity.HasOne(d => d.Category).WithMany(p => p.ItemCategoryMappings)
+                .HasForeignKey(d => d.CategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            entity.HasOne(d => d.MenuItem).WithMany(p => p.ItemCategoryMappings)
+                .HasForeignKey(d => d.MenuItemId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
 
         OnModelCreatingPartial(modelBuilder);
     }

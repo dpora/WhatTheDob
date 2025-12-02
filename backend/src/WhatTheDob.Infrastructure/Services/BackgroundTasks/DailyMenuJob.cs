@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.BackgroundTasks;
-using Microsoft.Extensions.Configuration;
 
 namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
 {
@@ -12,30 +13,35 @@ namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
     /// </summary>
     public class DailyMenuJob : IDailyMenuJob
     {
-        private bool _initialRun = true;
-        private static Timer _timer;
-        private readonly IConfiguration _configuration;
+        private Timer? _timer;
+        private readonly IServiceScopeFactory _scopeFactory;
 
-        public DailyMenuJob(IConfiguration configuration)
+        public DailyMenuJob(IServiceScopeFactory scopeFactory)
         {
-            _configuration = configuration;
+            _scopeFactory = scopeFactory;
         }
 
         public async Task RunTaskAsync()
         {
             Console.WriteLine("Scheduled task running at: " + DateTime.Now);
-            // Place real async work here, e.g., calling MenuService
-            await Task.CompletedTask;
+            using var scope = _scopeFactory.CreateScope();
+            var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
+            await menuService.GetMenuPagesAsync().ConfigureAwait(false);
         }
 
         public void ScheduleMidnightTask()
         {
+            if (_timer != null)
+            {
+                return;
+            }
+
             DateTime now = DateTime.Now;
             DateTime nextMidnight = now.Date.AddDays(1); // tomorrow 00:00
             TimeSpan initialDelay = nextMidnight - now;
             TimeSpan interval = TimeSpan.FromDays(1);
 
-            _timer = new Timer(async _ => await RunTaskAsync(), null, initialDelay, interval);
+            _timer = new Timer(async _ => await RunTaskAsync().ConfigureAwait(false), null, initialDelay, interval);
 
             Console.WriteLine("First run at: " + nextMidnight);
         }

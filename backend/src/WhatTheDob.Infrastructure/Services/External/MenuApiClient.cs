@@ -1,5 +1,5 @@
-﻿using System.Net.Http;
-using System.Net.Http.Headers;
+﻿using System.Collections.Generic;
+using System.Net.Http;
 using System.Threading.Tasks;
 using WhatTheDob.Application.Interfaces.Services.External;
 
@@ -7,21 +7,45 @@ namespace WhatTheDob.Infrastructure.Services.External
 {
     public class MenuApiClient : IMenuApiClient
     {
-        private static readonly HttpClient _client = new HttpClient();
+        private readonly HttpClient _httpClient;
 
-        public async Task<string> GetMenuDataAsync(string url, string menuDate, string meal, int campusId)
+        public MenuApiClient(HttpClient httpClient)
         {
-            //Build the POST request
-            HttpRequestMessage request = new HttpRequestMessage(HttpMethod.Post, url);
-            request.Content = new StringContent($"selMenuDate={menuDate}&selMeal={meal}&selCampus={campusId}");
-            request.Content.Headers.ContentType = new MediaTypeHeaderValue("application/x-www-form-urlencoded");
+            _httpClient = httpClient;
+        }
 
-            //Send the request
-            HttpResponseMessage response = await _client.SendAsync(request);
+        public async Task<string> GetMenuDataAsync(string url, string? menuDate = null, string? meal = null, int? campusId = null)
+        {
+            var hasFilters = !string.IsNullOrWhiteSpace(menuDate) || !string.IsNullOrWhiteSpace(meal) || campusId.HasValue;
+
+            using var request = new HttpRequestMessage(hasFilters ? HttpMethod.Post : HttpMethod.Get, url);
+
+            if (hasFilters)
+            {
+                var formValues = new List<KeyValuePair<string, string>>();
+
+                if (!string.IsNullOrWhiteSpace(menuDate))
+                {
+                    formValues.Add(new KeyValuePair<string, string>("selMenuDate", menuDate));
+                }
+
+                if (!string.IsNullOrWhiteSpace(meal))
+                {
+                    formValues.Add(new KeyValuePair<string, string>("selMeal", meal));
+                }
+
+                if (campusId.HasValue)
+                {
+                    formValues.Add(new KeyValuePair<string, string>("selCampus", campusId.Value.ToString()));
+                }
+
+                request.Content = new FormUrlEncodedContent(formValues);
+            }
+
+            using var response = await _httpClient.SendAsync(request).ConfigureAwait(false);
             response.EnsureSuccessStatusCode();
 
-            //Return the response content as a string
-            return await response.Content.ReadAsStringAsync();
+            return await response.Content.ReadAsStringAsync().ConfigureAwait(false);
         }
     }
 }

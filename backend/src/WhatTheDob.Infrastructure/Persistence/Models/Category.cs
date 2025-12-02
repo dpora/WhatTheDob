@@ -9,5 +9,5 @@ public partial class Category
 
     public string Value { get; set; } = null!;
 
-    public virtual ICollection<MenuItem> MenuItems { get; set; } = new List<MenuItem>();
+    public virtual ICollection<ItemCategoryMapping> ItemCategoryMappings { get; set; } = new List<ItemCategoryMapping>();
 }

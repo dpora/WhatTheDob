@@ -7,6 +7,6 @@ namespace WhatTheDob.Application.Interfaces.Services.External
  /// </summary>
  public interface IMenuApiClient
  {
- Task<string> GetMenuDataAsync(string url, string menuDate, string meal, int campusId);
+ Task<string> GetMenuDataAsync(string url, string? menuDate = null, string? meal = null, int? campusId = null);
  }
 }

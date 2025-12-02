@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace WhatTheDob.Core.Data;
+namespace WhatTheDob.Domain.Data;
 
 public partial class MenuMapping
 {

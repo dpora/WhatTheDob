@@ -1,8 +1,8 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
-using WhatTheDob.Core.Entities;
+using WhatTheDob.Domain.Entities;
 
-namespace WhatTheDob.Core.Services
+namespace WhatTheDob.Application.Interfaces.Services
 {
     /// <summary>
     /// Interface for menu-related operations implemented by the Infrastructure project.

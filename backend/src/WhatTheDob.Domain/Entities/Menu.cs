@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
+using WhatTheDob.Domain.Entities;
 
-namespace WhatTheDob.Core.Entities
+namespace WhatTheDob.Domain.Entities
 {
     public class Menu
     {
@@ -24,23 +25,4 @@ namespace WhatTheDob.Core.Entities
         }
     }
 
-    public class MenuItem
-    {
-        public string Value { get; set; }
-        public List<string> Tags { get; set; } = new List<string>();
-        public string Category { get; set; }
-
-        // Parameterized constructor
-        public MenuItem(string value, List<string> tags, string category)
-        {
-            Value = value;
-            Tags = tags;
-            Category = category;
-        }
-
-        // Default constructor
-        public MenuItem() : this(string.Empty, new List<string>(), string.Empty)
-        {
-        }
-    }
 }

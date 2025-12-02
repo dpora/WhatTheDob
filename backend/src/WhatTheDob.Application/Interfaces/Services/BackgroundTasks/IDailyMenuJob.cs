@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace WhatTheDob.Core.Services.BackgroundTasks
+namespace WhatTheDob.Application.Interfaces.Services.BackgroundTasks
 {
     public interface IDailyMenuJob
     {

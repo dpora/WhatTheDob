@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Threading;
 using System.Threading.Tasks;
-using WhatTheDob.Core.Services.BackgroundTasks;
+using WhatTheDob.Application.Interfaces.Services.BackgroundTasks;
 using Microsoft.Extensions.Configuration;
 
 namespace WhatTheDob.Infrastructure.Services.BackgroundTasks

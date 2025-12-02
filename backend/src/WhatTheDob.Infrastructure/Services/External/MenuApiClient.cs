@@ -1,7 +1,7 @@
 ﻿using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
-using WhatTheDob.Core.Services.External;
+using WhatTheDob.Application.Interfaces.Services.External;
 
 namespace WhatTheDob.Infrastructure.Services.External
 {

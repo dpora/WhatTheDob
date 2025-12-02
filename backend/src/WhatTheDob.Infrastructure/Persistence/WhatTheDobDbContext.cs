@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
 
-namespace WhatTheDob.Core.Data;
+namespace WhatTheDob.Domain.Data;
 
 public partial class WhatTheDobDbContext : DbContext
 {

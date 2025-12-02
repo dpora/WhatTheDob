@@ -1,7 +1,7 @@
-using WhatTheDob.Core.Services;
-using WhatTheDob.Core.Services.External;
-using WhatTheDob.Core.Mapping;
-using WhatTheDob.Core.Services.BackgroundTasks;
+using WhatTheDob.Domain.Services;
+using WhatTheDob.Domain.Services.External;
+using WhatTheDob.Domain.Mapping;
+using WhatTheDob.Domain.Services.BackgroundTasks;
 using WhatTheDob.Infrastructure.Services;
 using WhatTheDob.Infrastructure.Services.External;
 using WhatTheDob.Infrastructure.Mapping;

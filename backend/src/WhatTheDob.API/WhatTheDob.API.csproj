@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\WhatTheDob.Core\WhatTheDob.Core.csproj" />
+    <ProjectReference Include="..\WhatTheDob.Domain\WhatTheDob.Domain.csproj" />
     <ProjectReference Include="..\WhatTheDob.Infrastructure\WhatTheDob.Infrastructure.csproj" />
   </ItemGroup>
 

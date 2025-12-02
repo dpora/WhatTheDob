@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
-using WhatTheDob.Core.Entities;
-using WhatTheDob.Core.Services;
-using WhatTheDob.Core.Services.External;
-using WhatTheDob.Core.Mapping;
+using WhatTheDob.Domain.Entities;
+using WhatTheDob.Application.Interfaces.Services;
+using WhatTheDob.Application.Interfaces.Services.External;
+using WhatTheDob.Application.Interfaces.Mapping;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 

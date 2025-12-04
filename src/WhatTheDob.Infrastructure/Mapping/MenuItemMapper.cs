@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WhatTheDob.Domain.Entities;
-using WhatTheDob.Application.Interfaces.Mapping;
+using WhatTheDob.Infrastructure.Interfaces.Mapping;
 using HtmlAgilityPack;
 
 namespace WhatTheDob.Infrastructure.Mapping

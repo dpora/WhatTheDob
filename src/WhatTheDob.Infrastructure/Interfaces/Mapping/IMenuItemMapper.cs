@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using WhatTheDob.Domain.Entities;
 
-namespace WhatTheDob.Application.Interfaces.Mapping
+namespace WhatTheDob.Infrastructure.Interfaces.Mapping
 {
      /// <summary>
      /// Parses HTML into MenuItem entities. Implemented by Infrastructure.

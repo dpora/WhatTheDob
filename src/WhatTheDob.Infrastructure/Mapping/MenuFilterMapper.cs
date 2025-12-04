@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using HtmlAgilityPack;
-using WhatTheDob.Application.Interfaces.Mapping;
+using WhatTheDob.Infrastructure.Interfaces.Mapping;
 
 namespace WhatTheDob.Infrastructure.Mapping
 {

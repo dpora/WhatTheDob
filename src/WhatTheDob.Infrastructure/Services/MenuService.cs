@@ -1,13 +1,14 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using WhatTheDob.Application.Interfaces.Mapping;
-using WhatTheDob.Application.Interfaces.Persistence;
 using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.External;
 using WhatTheDob.Domain.Entities;
+using WhatTheDob.Infrastructure.Interfaces.Mapping;
+using WhatTheDob.Infrastructure.Interfaces.Persistence;
 
 namespace WhatTheDob.Infrastructure.Services
 {
@@ -47,7 +48,7 @@ namespace WhatTheDob.Infrastructure.Services
             _menuFilterMapper = menuFilterMapper;
         }
 
-        public async Task<List<Menu>> GetMenuPagesAsync()
+        public async Task<List<Menu>> MenuPagesSync()
         {
             var menus = new List<Menu>();
 
@@ -117,6 +118,30 @@ namespace WhatTheDob.Infrastructure.Services
             }
 
             return menus;
+        }
+
+        public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
+        {
+            var menuMappings = await _menuRepository.GetMenuMappingsAsync(date, campusId, mealId).ConfigureAwait(false);
+            if (menuMappings == null)
+            {
+                return null;
+            }
+            var domainMenu = new Menu
+            {
+                Date = date,
+                CampusId = campusId,
+                Meal = mealId.ToString(),
+                Items = [.. menuMappings.Select(mm => new MenuItem
+                {
+                    Value = mm.MenuItem.Value,
+                    Category = mm.MenuItem.Category.Value,
+                    Tags = string.IsNullOrEmpty(mm.MenuItem.Tags) ? new List<string>() : mm.MenuItem.Tags.Split(',').ToList(),
+                    TotalRating = mm.MenuItem.ItemRating.TotalRating,
+                    RatingCount = mm.MenuItem.ItemRating.RatingCount
+                })]
+            };
+            return domainMenu;
         }
     }
 }

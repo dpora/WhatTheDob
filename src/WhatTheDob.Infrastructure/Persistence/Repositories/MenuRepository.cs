@@ -5,16 +5,19 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
-using WhatTheDob.Application.Interfaces.Persistence;
+using WhatTheDob.Infrastructure.Interfaces.Persistence;
+
 using DomainMenu = WhatTheDob.Domain.Entities.Menu;
-using PersistenceCategory = WhatTheDob.Domain.Data.Category;
-using PersistenceItemCategoryMapping = WhatTheDob.Domain.Data.ItemCategoryMapping;
-using PersistenceCampus = WhatTheDob.Domain.Data.Campus;
-using PersistenceContext = WhatTheDob.Domain.Data.WhatTheDobDbContext;
-using PersistenceMeal = WhatTheDob.Domain.Data.Meal;
-using PersistenceMenu = WhatTheDob.Domain.Data.Menu;
-using PersistenceMenuItem = WhatTheDob.Domain.Data.MenuItem;
-using PersistenceMenuMapping = WhatTheDob.Domain.Data.MenuMapping;
+using DomainMenuItem = WhatTheDob.Domain.Entities.MenuItem;
+
+using PersistenceContext = WhatTheDob.Infrastructure.Persistence.WhatTheDobDbContext;
+using PersistenceCategory = WhatTheDob.Infrastructure.Persistence.Models.Category;
+using PersistenceCampus = WhatTheDob.Infrastructure.Persistence.Models.Campus;
+using PersistenceItemRating = WhatTheDob.Infrastructure.Persistence.Models.ItemRating;
+using PersistenceMeal = WhatTheDob.Infrastructure.Persistence.Models.Meal;
+using PersistenceMenu = WhatTheDob.Infrastructure.Persistence.Models.Menu;
+using PersistenceMenuItem = WhatTheDob.Infrastructure.Persistence.Models.MenuItem;
+using PersistenceMenuMapping = WhatTheDob.Infrastructure.Persistence.Models.MenuMapping;
 
 namespace WhatTheDob.Infrastructure.Persistence.Repositories
 {
@@ -106,6 +109,66 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
             }
         }
 
+        public async Task<PersistenceMenu> GetMenuAsync(string date, int campusId, int mealId, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.Menus
+                .AsNoTracking()
+                .Include(m => m.Meal)
+                .Include(m => m.Campus)
+                .FirstOrDefaultAsync(m => m.Date == date && m.CampusId == campusId && m.MealId == mealId, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        
+        public async Task<IEnumerable<PersistenceMenuMapping>> GetMenuMappingsAsync(int menuId, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.MenuMappings
+                .AsNoTracking()
+                .Where(mm => mm.MenuId == menuId)
+                .Include(mm => mm.Menu)
+                    .ThenInclude(m => m.Meal)
+                .Include(mm => mm.Menu)
+                    .ThenInclude(m => m.Campus)
+                .Include(mm => mm.MenuItem)
+                    .ThenInclude(mi => mi.Category)
+                .Include(mm => mm.MenuItem)
+                    .ThenInclude(mi => mi.ItemRating)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<PersistenceMenuMapping>> GetMenuMappingsAsync(string date, int campusId, int mealId, CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.MenuMappings
+                .AsNoTracking()
+                .Where(mm => mm.Menu.CampusId == campusId &&
+                             mm.Menu.MealId == mealId &&
+                             mm.Menu.Date == date)
+                .Include(mm => mm.Menu)
+                    .ThenInclude(m => m.Meal)
+                .Include(mm => mm.Menu)
+                    .ThenInclude(m => m.Campus)
+                .Include(mm => mm.MenuItem)
+                    .ThenInclude(mi => mi.Category)
+                .Include(mm => mm.MenuItem)
+                    .ThenInclude(mi => mi.ItemRating)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task UpdateItemRating(string itemValue, int rating, CancellationToken cancellationToken = default)
+        {
+            var itemRating = await _dbContext.ItemRatings
+                .AsTracking()
+                .FirstOrDefaultAsync(r => r.Value == itemValue.Trim(), cancellationToken)
+                .ConfigureAwait(false);
+            if (itemRating != null)
+            {
+                itemRating.TotalRating += rating;
+                itemRating.RatingCount += 1;
+                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+        }
+
         private async Task UpsertMenuAsync(DomainMenu menu, CancellationToken cancellationToken)
         {
             await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
@@ -142,10 +205,12 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
                 var menuItemEntity = await _dbContext.MenuItems
                     .AsTracking()
-                    .FirstOrDefaultAsync(mi => mi.Value == item.Value, cancellationToken)
+                    .FirstOrDefaultAsync(mi => mi.Value == item.Value && mi.CategoryId == category.Id, cancellationToken)
                     .ConfigureAwait(false);
 
                 var tags = item.Tags != null && item.Tags.Count > 0 ? string.Join(",", item.Tags) : null;
+
+                var itemRating = await GetOrCreateItemRatingAsync(item.Value, cancellationToken).ConfigureAwait(false);
 
                 if (menuItemEntity == null)
                 {
@@ -153,8 +218,8 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     {
                         Value = item.Value,
                         Tags = tags,
-                        RatingCount = 0,
-                        RatingTotal = 0
+                        CategoryId = category.Id,
+                        ItemRatingId = itemRating.Id
                     };
 
                     _dbContext.MenuItems.Add(menuItemEntity);
@@ -163,9 +228,9 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 else
                 {
                     menuItemEntity.Tags = tags;
+                    menuItemEntity.CategoryId = category.Id;
+                    menuItemEntity.ItemRatingId = itemRating.Id;
                 }
-
-                await GetOrCreateItemCategoryMappingAsync(menuItemEntity.Id, category.Id, cancellationToken);
 
                 _dbContext.MenuMappings.Add(new PersistenceMenuMapping
                 {
@@ -229,30 +294,32 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
             return category;
         }
-
-        private async Task<PersistenceItemCategoryMapping> GetOrCreateItemCategoryMappingAsync(int menuItemId, int categoryId, CancellationToken cancellationToken)
+       
+        private async Task<PersistenceItemRating> GetOrCreateItemRatingAsync(string itemValue, CancellationToken cancellationToken)
         {
+            var normalized = itemValue.Trim();
 
-            var itemCategoryMapping = await _dbContext.ItemCategoryMappings
-                    .AsTracking()
-                    .FirstOrDefaultAsync(icm => icm.MenuItemId == menuItemId && icm.CategoryId == categoryId, cancellationToken)
-                    .ConfigureAwait(false);
+            var itemRating = await _dbContext.ItemRatings
+                .AsTracking()
+                .FirstOrDefaultAsync(r => r.Value == normalized, cancellationToken)
+                .ConfigureAwait(false);
 
-            if (itemCategoryMapping != null)
+            if (itemRating != null)
             {
-                return itemCategoryMapping;
+                return itemRating;
             }
 
-            itemCategoryMapping = new PersistenceItemCategoryMapping
+            itemRating = new PersistenceItemRating
             {
-                MenuItemId = menuItemId,
-                CategoryId = categoryId
+                Value = normalized,
+                TotalRating = 0,
+                RatingCount = 0
             };
 
-            _dbContext.ItemCategoryMappings.Add(itemCategoryMapping);
+            _dbContext.ItemRatings.Add(itemRating);
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
-            return itemCategoryMapping;
+            return itemRating;
         }
     }
 }

@@ -26,7 +26,8 @@ namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
             Console.WriteLine("Scheduled task running at: " + DateTime.Now);
             using var scope = _scopeFactory.CreateScope();
             var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
-            await menuService.GetMenuPagesAsync().ConfigureAwait(false);
+            var menus = await menuService.GetMenuAsync("12/03/25", 46, 3);
+            await menuService.MenuPagesSync().ConfigureAwait(false);
         }
 
         public void ScheduleMidnightTask()

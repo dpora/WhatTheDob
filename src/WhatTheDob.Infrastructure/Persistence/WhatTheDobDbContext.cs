@@ -1,8 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.EntityFrameworkCore;
+using WhatTheDob.Infrastructure.Persistence.Models;
 
-namespace WhatTheDob.Domain.Data;
+namespace WhatTheDob.Infrastructure.Persistence;
 
 public partial class WhatTheDobDbContext : DbContext
 {
@@ -26,7 +27,8 @@ public partial class WhatTheDobDbContext : DbContext
     public virtual DbSet<MenuItem> MenuItems { get; set; }
 
     public virtual DbSet<MenuMapping> MenuMappings { get; set; }
-    public virtual DbSet<ItemCategoryMapping> ItemCategoryMappings { get; set; }
+
+    public virtual DbSet<ItemRating> ItemRatings { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +77,16 @@ public partial class WhatTheDobDbContext : DbContext
             entity.ToTable("MenuItem");
 
             entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.CategoryId).HasColumnName("CategoryID");
+            entity.Property(e => e.ItemRatingId).HasColumnName("ItemRatingID");
+
+            entity.HasOne(d => d.Category).WithMany(p => p.MenuItems)
+                .HasForeignKey(d => d.CategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+
+            entity.HasOne(d => d.ItemRating).WithMany(p => p.MenuItems)
+                .HasForeignKey(d => d.ItemRatingId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
         modelBuilder.Entity<MenuMapping>(entity =>
@@ -94,21 +106,14 @@ public partial class WhatTheDobDbContext : DbContext
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
-        modelBuilder.Entity<ItemCategoryMapping>(entity =>
+        modelBuilder.Entity<ItemRating>(entity =>
         {
-            entity.ToTable("ItemCategoryMapping");
+            entity.ToTable("ItemRating");
 
             entity.Property(e => e.Id).HasColumnName("ID");
-            entity.Property(e => e.CategoryId).HasColumnName("CategoryID");
-            entity.Property(e => e.MenuItemId).HasColumnName("MenuItemID");
-
-            entity.HasOne(d => d.Category).WithMany(p => p.ItemCategoryMappings)
-                .HasForeignKey(d => d.CategoryId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
-
-            entity.HasOne(d => d.MenuItem).WithMany(p => p.ItemCategoryMappings)
-                .HasForeignKey(d => d.MenuItemId)
-                .OnDelete(DeleteBehavior.ClientSetNull);
+            entity.Property(e => e.Value).HasColumnName("Value");
+            entity.Property(e => e.TotalRating).HasColumnName("TotalRating");
+            entity.Property(e => e.RatingCount).HasColumnName("RatingCount");
         });
 
 

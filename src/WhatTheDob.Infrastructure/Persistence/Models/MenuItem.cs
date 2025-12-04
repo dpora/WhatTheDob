@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 
-namespace WhatTheDob.Domain.Data;
+namespace WhatTheDob.Infrastructure.Persistence.Models;
 
 public partial class MenuItem
 {
@@ -11,10 +11,12 @@ public partial class MenuItem
 
     public string? Tags { get; set; }
 
-    public int RatingTotal { get; set; }
+    public int CategoryId { get; set; }
 
-    public int RatingCount { get; set; }
-    
-    public virtual ICollection<ItemCategoryMapping> ItemCategoryMappings { get; set; } = new List<ItemCategoryMapping>();
+    public int ItemRatingId { get; set; }
+
+    public virtual Category Category { get; set; } = null!;
+
+    public virtual ItemRating ItemRating { get; set; } = null!;
 
 }

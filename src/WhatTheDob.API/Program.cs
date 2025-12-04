@@ -1,11 +1,11 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using WhatTheDob.Application.Interfaces.Mapping;
-using WhatTheDob.Application.Interfaces.Persistence;
+using WhatTheDob.Infrastructure.Interfaces.Mapping;
+using WhatTheDob.Infrastructure.Interfaces.Persistence;
 using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.BackgroundTasks;
 using WhatTheDob.Application.Interfaces.Services.External;
-using WhatTheDob.Domain.Data;
+using WhatTheDob.Infrastructure.Persistence;
 using WhatTheDob.Infrastructure.Services;
 using WhatTheDob.Infrastructure.Services.External;
 using WhatTheDob.Infrastructure.Mapping;
@@ -54,7 +54,7 @@ app.UseHttpsRedirection();
 
 app.MapGet("/getMenu", async (IMenuService menuService) =>
 {
-    var menus = await menuService.GetMenuPagesAsync();
+    var menus = await menuService.GetMenuAsync("12/03/25", 46, 3);
     return Results.Ok(menus);
 })
 .WithName("GetMenu");

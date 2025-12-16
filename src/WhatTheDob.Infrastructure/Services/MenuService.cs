@@ -48,7 +48,7 @@ namespace WhatTheDob.Infrastructure.Services
             _menuFilterMapper = menuFilterMapper;
         }
 
-        public async Task<List<Menu>> MenuPagesSync()
+        public async Task<List<Menu>> FetchMenusFromApiAsync()
         {
             var menus = new List<Menu>();
 

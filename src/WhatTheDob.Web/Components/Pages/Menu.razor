@@ -1,0 +1,75 @@
+@page "/menu"
+@inject IMenuService MenuService
+@using MenuModel = WhatTheDob.Domain.Entities.Menu
+
+<PageTitle>Menu</PageTitle>
+
+<h1>Menu</h1>
+
+@if (_isLoading)
+{
+    <p>Loading menu...</p>
+}
+else if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else if (_menu is null)
+{
+    <p>No menu data was found for the requested parameters.</p>
+}
+else
+{
+    <section class="menu-metadata">
+        <p><strong>Date:</strong> @_menu.Date</p>
+        <p><strong>Meal Id:</strong> @_menu.Meal</p>
+        <p><strong>Campus Id:</strong> @_menu.CampusId</p>
+    </section>
+
+    <section class="menu-items">
+        <h2>Items</h2>
+        @if (_menu.Items.Count == 0)
+        {
+            <p>No items were returned for this menu.</p>
+        }
+        else
+        {
+            <ul class="menu-item-list">
+                @foreach (var item in _menu.Items)
+                {
+                    <li class="menu-item">
+                        <h3>@item.Value</h3>
+                        <p><strong>Category:</strong> @item.Category</p>
+                        @if (item.Tags?.Count > 0)
+                        {
+                            <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
+                        }
+                        <p><strong>Ratings:</strong> @item.TotalRating (Total) across @item.RatingCount vote(s)</p>
+                    </li>
+                }
+            </ul>
+        }
+    </section>
+}
+
+@code {
+    private MenuModel? _menu;
+    private bool _isLoading = true;
+    private string? _errorMessage;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            _menu = await MenuService.GetMenuAsync("12/03/25", 46, 3);
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load menu: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

@@ -9,7 +9,8 @@ namespace WhatTheDob.Application.Interfaces.Services
     /// </summary>
     public interface IMenuService
     {
-        Task<List<Menu>> MenuPagesSync();
+        //Task<List<Menu>> FetchMenusFromApiAsync(int daysAhead);
+        //Task<List<Menu>> FetchMenuFromApiAsync(int dayOffset);
         Task<Menu> GetMenuAsync(string date, int campusId, int mealId);
     }
 }

@@ -33,72 +33,99 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
             _dbContext = dbContext;
         }
 
-        public async Task UpsertFiltersAsync(IDictionary<int, string> campuses, IEnumerable<string> meals, CancellationToken cancellationToken = default)
+        public async Task UpsertCampusesAsync(IDictionary<int, string> campuses, CancellationToken cancellationToken = default)
         {
-            if (campuses != null)
+            if (campuses == null)
             {
-                foreach (var campus in campuses)
-                {
-                    var campusEntity = await _dbContext.Campuses
-                        .AsTracking()
-                        .FirstOrDefaultAsync(c => c.Id == campus.Key, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (campusEntity == null)
-                    {
-                        campusEntity = new PersistenceCampus
-                        {
-                            Id = campus.Key,
-                            Value = campus.Value,
-                            Disabled = 0
-                        };
-
-                        _dbContext.Campuses.Add(campusEntity);
-                    }
-                    else
-                    {
-                        campusEntity.Value = campus.Value;
-                        campusEntity.Disabled = 0;
-                    }
-                }
+                return;
             }
 
-            if (meals != null)
+            foreach (var campus in campuses)
             {
-                var distinctMeals = new HashSet<string>(meals, StringComparer.OrdinalIgnoreCase);
+                var campusEntity = await _dbContext.Campuses
+                    .AsTracking()
+                    .FirstOrDefaultAsync(c => c.Id == campus.Key, cancellationToken)
+                    .ConfigureAwait(false);
 
-                foreach (var mealName in distinctMeals)
+                if (campusEntity == null)
                 {
-                    var normalized = mealName?.Trim();
-
-                    if (string.IsNullOrEmpty(normalized))
+                    campusEntity = new PersistenceCampus
                     {
-                        continue;
-                    }
+                        Id = campus.Key,
+                        Value = campus.Value,
+                        Disabled = 0
+                    };
 
-                    var mealEntity = await _dbContext.Meals
-                        .AsTracking()
-                        .FirstOrDefaultAsync(m => m.Value == normalized, cancellationToken)
-                        .ConfigureAwait(false);
-
-                    if (mealEntity == null)
-                    {
-                        mealEntity = new PersistenceMeal
-                        {
-                            Value = normalized,
-                            Disabled = 0
-                        };
-
-                        _dbContext.Meals.Add(mealEntity);
-                    }
-                    else
-                    {
-                        mealEntity.Disabled = 0;
-                    }
+                    _dbContext.Campuses.Add(campusEntity);
+                }
+                else
+                {
+                    campusEntity.Value = campus.Value;
+                    campusEntity.Disabled = 0;
                 }
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<PersistenceCampus>> GetCampusesAsync(CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.Campuses
+                .AsNoTracking()
+                .Where(c => c.Disabled == 0)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
+        }
+
+        public async Task UpsertMealsAsync(IEnumerable<string> meals, CancellationToken cancellationToken = default)
+        {
+            if (meals == null)
+            {
+                return;
+            }
+
+            var distinctMeals = new HashSet<string>(meals, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var mealName in distinctMeals)
+            {
+                var normalized = mealName?.Trim();
+
+                if (string.IsNullOrEmpty(normalized))
+                {
+                    continue;
+                }
+
+                var mealEntity = await _dbContext.Meals
+                    .AsTracking()
+                    .FirstOrDefaultAsync(m => m.Value == normalized, cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (mealEntity == null)
+                {
+                    mealEntity = new PersistenceMeal
+                    {
+                        Value = normalized,
+                        Disabled = 0
+                    };
+
+                    _dbContext.Meals.Add(mealEntity);
+                }
+                else
+                {
+                    mealEntity.Disabled = 0;
+                }
+            }
+
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+        }
+
+        public async Task<IEnumerable<PersistenceMeal>> GetMealsAsync(CancellationToken cancellationToken = default)
+        {
+            return await _dbContext.Meals
+                .AsNoTracking()
+                .Where(m => m.Disabled == 0)
+                .ToListAsync(cancellationToken)
+                .ConfigureAwait(false);
         }
 
         public async Task UpsertMenusAsync(IEnumerable<DomainMenu> menus, CancellationToken cancellationToken = default)
@@ -155,7 +182,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 .ConfigureAwait(false);
         }
 
-        public async Task UpdateItemRating(string itemValue, int rating, CancellationToken cancellationToken = default)
+        public async Task UpsertItemRatingAsync(string itemValue, int rating, CancellationToken cancellationToken = default)
         {
             var itemRating = await _dbContext.ItemRatings
                 .AsTracking()

@@ -1,12 +1,60 @@
 @page "/menu"
+@rendermode InteractiveServer
 @inject IMenuService MenuService
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
+@using WhatTheDob.Application.DTOs
 
 <PageTitle>Menu</PageTitle>
 
 <h1>Menu</h1>
 
-@if (_isLoading)
+<section class="menu-filters">
+    <div class="filter-group">
+        <label for="dateInput">Date:</label>
+        <input id="dateInput" type="date" @bind="_selectedDate" class="form-control" />
+    </div>
+    
+    <div class="filter-group">
+        <label for="campusSelect">Campus:</label>
+        <select id="campusSelect" @bind="_selectedCampusId" class="form-select" disabled="@_isLoadingFilters">
+            <option value="">-- Select Campus --</option>
+            @foreach (var campus in _campuses)
+            {
+                <option value="@campus.Id">@campus.Value</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <label for="mealSelect">Meal:</label>
+        <select id="mealSelect" @bind="_selectedMealId" class="form-select" disabled="@_isLoadingFilters">
+            <option value="">-- Select Meal --</option>
+            @foreach (var meal in _meals)
+            {
+                <option value="@meal.Id">@meal.Value</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <button type="button" @onclick="LoadMenuAsync" disabled="@(_isLoading || _isLoadingFilters)" class="btn btn-primary">
+            @if (_isLoading)
+            {
+                <span>Loading...</span>
+            }
+            else
+            {
+                <span>Load Menu</span>
+            }
+        </button>
+    </div>
+</section>
+
+@if (_isLoadingFilters)
+{
+    <p>Loading filters...</p>
+}
+else if (_isLoading)
 {
     <p>Loading menu...</p>
 }
@@ -16,7 +64,7 @@ else if (!string.IsNullOrEmpty(_errorMessage))
 }
 else if (_menu is null)
 {
-    <p>No menu data was found for the requested parameters.</p>
+    <p>Select a date, campus, and meal, then click "Load Menu" to view the menu.</p>
 }
 else
 {
@@ -54,14 +102,72 @@ else
 
 @code {
     private MenuModel? _menu;
-    private bool _isLoading = true;
+    private bool _isLoading = false;
+    private bool _isLoadingFilters = true;
     private string? _errorMessage;
+    
+    private List<CampusDto> _campuses = new();
+    private List<MealDto> _meals = new();
+    
+    private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Now);
+    private int? _selectedCampusId;
+    private int? _selectedMealId;
 
     protected override async Task OnInitializedAsync()
     {
         try
         {
-            _menu = await MenuService.GetMenuAsync("12/03/25", 46, 3);
+            var campusesTask = MenuService.GetCampusesAsync();
+            var mealsTask = MenuService.GetMealsAsync();
+            
+            await Task.WhenAll(campusesTask, mealsTask);
+            
+            _campuses = (await campusesTask).ToList();
+            _meals = (await mealsTask).ToList();
+            
+            if (_campuses.Any())
+            {
+                _selectedCampusId = _campuses.First().Id;
+            }
+            
+            if (_meals.Any())
+            {
+                _selectedMealId = _meals.First().Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load filters: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingFilters = false;
+        }
+    }
+    
+    private async Task LoadMenuAsync()
+    {
+        if (!_selectedCampusId.HasValue || !_selectedMealId.HasValue)
+        {
+            _errorMessage = "Please select both a campus and a meal.";
+            StateHasChanged();
+            return;
+        }
+        
+        _isLoading = true;
+        _errorMessage = null;   
+        StateHasChanged();
+        
+        try
+        {
+            var formattedDate = _selectedDate.ToString("MM/dd/yy");
+            
+            _menu = await MenuService.GetMenuAsync(formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
+            
+            if (_menu is null)
+            {
+                _errorMessage = "No menu found for the selected date, campus, and meal.";
+            }
         }
         catch (Exception ex)
         {
@@ -70,6 +176,7 @@ else
         finally
         {
             _isLoading = false;
+            StateHasChanged();
         }
     }
 }

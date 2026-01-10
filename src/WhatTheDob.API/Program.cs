@@ -18,9 +18,30 @@ var builder = WebApplication.CreateBuilder(args);
 //Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
 builder.Services.AddOpenApi();
 
+// Get data storage path from configuration
+var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:Path") ?? "datastorage";
+var repoRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."));
+var fullDataStoragePath = Path.Combine(repoRoot, dataStoragePath);
+
+// Update connection string to use the data storage path
+var connectionString = builder.Configuration.GetConnectionString("WhatTheDob");
+if (!string.IsNullOrWhiteSpace(connectionString))
+{
+    var connBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(connectionString);
+    var dataSource = connBuilder.DataSource;
+    
+    // If the data source is relative, combine it with the data storage path
+    if (!Path.IsPathRooted(dataSource))
+    {
+        var fullDbPath = Path.Combine(fullDataStoragePath, dataSource);
+        connBuilder.DataSource = fullDbPath;
+        connectionString = connBuilder.ToString();
+    }
+}
+
 // Register infrastructure implementations for Core interfaces
 builder.Services.AddDbContext<WhatTheDobDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("WhatTheDob")));
+    options.UseSqlite(connectionString));
 builder.Services.AddScoped<IMenuService, MenuService>();
 builder.Services.AddHttpClient<IMenuApiClient, MenuApiClient>();
 builder.Services.AddScoped<IMenuItemMapper, MenuItemMapper>();
@@ -35,7 +56,21 @@ using (var scope = app.Services.CreateScope())
     if (app.Environment.IsDevelopment())
     {
         var db = scope.ServiceProvider.GetRequiredService<WhatTheDobDbContext>();
-        Directory.CreateDirectory(Path.Combine(app.Environment.ContentRootPath, "database"));
+        
+        // Ensure the database directory exists
+        var dbConnection = db.Database.GetConnectionString();
+        if (!string.IsNullOrWhiteSpace(dbConnection))
+        {
+            var connBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(dbConnection);
+            var dbPath = connBuilder.DataSource;
+            
+            var directory = Path.GetDirectoryName(dbPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+        }
+
         db.Database.EnsureCreated();
     }
 

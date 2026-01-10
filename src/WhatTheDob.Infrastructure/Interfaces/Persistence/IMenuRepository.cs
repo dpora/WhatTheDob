@@ -20,11 +20,23 @@ namespace WhatTheDob.Infrastructure.Interfaces.Persistence
     /// </summary>
     public interface IMenuRepository
     {
-        Task UpsertFiltersAsync(IDictionary<int, string> campuses, IEnumerable<string> meals, CancellationToken cancellationToken = default);
+        // Campus Operations
+        Task UpsertCampusesAsync(IDictionary<int, string> campuses, CancellationToken cancellationToken = default);
+        Task<IEnumerable<PersistenceCampus>> GetCampusesAsync(CancellationToken cancellationToken = default);
+        
+        // Meal Operations
+        Task UpsertMealsAsync(IEnumerable<string> meals, CancellationToken cancellationToken = default);
+        Task<IEnumerable<PersistenceMeal>> GetMealsAsync(CancellationToken cancellationToken = default);
+        
+        // Menu Operations
         Task UpsertMenusAsync(IEnumerable<Menu> menus, CancellationToken cancellationToken = default);
-        Task UpdateItemRating(string itemValue, int rating, CancellationToken cancellationToken = default);
         Task<PersistenceMenu> GetMenuAsync(string date, int campusId, int mealId, CancellationToken cancellationToken = default);
+        
+        // Menu Query Projections
         Task<IEnumerable<PersistenceMenuMapping>> GetMenuMappingsAsync(int menuId, CancellationToken cancellationToken = default);
         Task<IEnumerable<PersistenceMenuMapping>> GetMenuMappingsAsync(string date, int campusId, int mealId, CancellationToken cancellationToken = default);
+        
+        // Item Rating Operations
+        Task UpsertItemRatingAsync(string itemValue, int rating, CancellationToken cancellationToken = default);
     }
 }

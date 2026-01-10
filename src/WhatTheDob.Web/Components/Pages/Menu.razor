@@ -82,20 +82,25 @@ else
         }
         else
         {
-            <ul class="menu-item-list">
-                @foreach (var item in _menu.Items)
-                {
-                    <li class="menu-item">
-                        <h3>@item.Value</h3>
-                        <p><strong>Category:</strong> @item.Category</p>
-                        @if (item.Tags?.Count > 0)
+            @foreach (var category in _menu.Items.GroupBy(item => item.Category).OrderBy(g => g.Key))
+            {
+                <div class="menu-category">
+                    <h3 class="category-header">@category.Key</h3>
+                    <ul class="menu-item-list">
+                        @foreach (var item in category)
                         {
-                            <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
+                            <li class="menu-item">
+                                <h4>@item.Value</h4>
+                                @if (item.Tags?.Count > 0)
+                                {
+                                    <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
+                                }
+                                <p><strong>Ratings:</strong> @item.TotalRating (Total) across @item.RatingCount vote(s)</p>
+                            </li>
                         }
-                        <p><strong>Ratings:</strong> @item.TotalRating (Total) across @item.RatingCount vote(s)</p>
-                    </li>
-                }
-            </ul>
+                    </ul>
+                </div>
+            }
         }
     </section>
 }

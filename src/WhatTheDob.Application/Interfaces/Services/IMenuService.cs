@@ -1,5 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
+using WhatTheDob.Application.DTOs;
 using WhatTheDob.Domain.Entities;
 
 namespace WhatTheDob.Application.Interfaces.Services
@@ -9,7 +10,9 @@ namespace WhatTheDob.Application.Interfaces.Services
     /// </summary>
     public interface IMenuService
     {
-        Task<List<Menu>> MenuPagesSync();
         Task<Menu> GetMenuAsync(string date, int campusId, int mealId);
+        Task<List<Menu>> FetchMenusFromApiAsync();
+        Task<IEnumerable<CampusDto>> GetCampusesAsync();
+        Task<IEnumerable<MealDto>> GetMealsAsync();
     }
 }

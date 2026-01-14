@@ -1,22 +1,24 @@
+using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
-using WhatTheDob.Infrastructure.Interfaces.Mapping;
-using WhatTheDob.Infrastructure.Interfaces.Persistence;
+using System.IO;
 using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.BackgroundTasks;
 using WhatTheDob.Application.Interfaces.Services.External;
-using WhatTheDob.Infrastructure.Persistence;
-using WhatTheDob.Infrastructure.Services;
-using WhatTheDob.Infrastructure.Services.External;
+using WhatTheDob.Infrastructure.Interfaces.Mapping;
+using WhatTheDob.Infrastructure.Interfaces.Persistence;
 using WhatTheDob.Infrastructure.Mapping;
-using WhatTheDob.Infrastructure.Services.BackgroundTasks;
+using WhatTheDob.Infrastructure.Persistence;
 using WhatTheDob.Infrastructure.Persistence.Repositories;
+using WhatTheDob.Infrastructure.Services;
+using WhatTheDob.Infrastructure.Services.BackgroundTasks;
+using WhatTheDob.Infrastructure.Services.External;
+using WhatTheDob.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
-//Add services to the container.
-//Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
-builder.Services.AddOpenApi();
+// Add services to the container.
+builder.Services.AddRazorComponents()
+    .AddInteractiveServerComponents();
 
 // Get data storage path from configuration
 var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:Path") ?? "datastorage";
@@ -27,7 +29,7 @@ var fullDataStoragePath = Path.Combine(repoRoot, dataStoragePath);
 var connectionString = builder.Configuration.GetConnectionString("WhatTheDob");
 if (!string.IsNullOrWhiteSpace(connectionString))
 {
-    var connBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(connectionString);
+    var connBuilder = new SqliteConnectionStringBuilder(connectionString);
     var dataSource = connBuilder.DataSource;
     
     // If the data source is relative, combine it with the data storage path
@@ -39,59 +41,60 @@ if (!string.IsNullOrWhiteSpace(connectionString))
     }
 }
 
-// Register infrastructure implementations for Core interfaces
 builder.Services.AddDbContext<WhatTheDobDbContext>(options =>
     options.UseSqlite(connectionString));
+
 builder.Services.AddScoped<IMenuService, MenuService>();
-builder.Services.AddHttpClient<IMenuApiClient, MenuApiClient>();
+builder.Services.AddScoped<IMenuRepository, MenuRepository>();
 builder.Services.AddScoped<IMenuItemMapper, MenuItemMapper>();
 builder.Services.AddScoped<IMenuFilterMapper, MenuFilterMapper>();
+builder.Services.AddHttpClient<IMenuApiClient, MenuApiClient>();
 builder.Services.AddSingleton<IDailyMenuJob, DailyMenuJob>();
-builder.Services.AddScoped<IMenuRepository, MenuRepository>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+// Configure the HTTP request pipeline.
+if (!app.Environment.IsDevelopment())
 {
-    if (app.Environment.IsDevelopment())
-    {
-        var db = scope.ServiceProvider.GetRequiredService<WhatTheDobDbContext>();
-        
-        // Ensure the database directory exists
-        var dbConnection = db.Database.GetConnectionString();
-        if (!string.IsNullOrWhiteSpace(dbConnection))
-        {
-            var connBuilder = new Microsoft.Data.Sqlite.SqliteConnectionStringBuilder(dbConnection);
-            var dbPath = connBuilder.DataSource;
-            
-            var directory = Path.GetDirectoryName(dbPath);
-            if (!string.IsNullOrEmpty(directory))
-            {
-                Directory.CreateDirectory(directory);
-            }
-        }
+    app.UseExceptionHandler("/Error", createScopeForErrors: true);
+    // The default HSTS value is 30 days. You may want to change this for production scenarios, see https://aka.ms/aspnetcore-hsts.
+    app.UseHsts();
+}
 
-        db.Database.EnsureCreated();
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var db = scope.ServiceProvider.GetRequiredService<WhatTheDobDbContext>();
+    
+    // Ensure the database directory exists
+    var dbConnection = db.Database.GetConnectionString();
+    if (!string.IsNullOrWhiteSpace(dbConnection))
+    {
+        var connBuilder = new SqliteConnectionStringBuilder(dbConnection);
+        var dbPath = connBuilder.DataSource;
+        
+        var directory = Path.GetDirectoryName(dbPath);
+        if (!string.IsNullOrEmpty(directory))
+        {
+            Directory.CreateDirectory(directory);
+        }
     }
+
+    // Ensure the database is created
+    await db.Database.EnsureCreatedAsync();
 
     var job = scope.ServiceProvider.GetRequiredService<IDailyMenuJob>();
     job.ScheduleMidnightTask();
     await job.RunTaskAsync();
 }
 
-//Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
-
 app.UseHttpsRedirection();
 
-app.MapGet("/getMenu", async (IMenuService menuService) =>
-{
-    var menus = await menuService.GetMenuAsync("12/03/25", 46, 3);
-    return Results.Ok(menus);
-})
-.WithName("GetMenu");
+
+app.UseAntiforgery();
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
 
 app.Run();

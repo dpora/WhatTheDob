@@ -11,6 +11,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Infrastructure",
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Application", "src\WhatTheDob.Application\WhatTheDob.Application.csproj", "{6C10250F-FBB9-42D3-B5E7-16DD13F309D6}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WhatTheDob.Web", "src\WhatTheDob.Web\WhatTheDob.Web.csproj", "{2FED4AAF-FD6D-4A39-9573-EAE2FE4225EF}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -33,6 +35,10 @@ Global
 		{6C10250F-FBB9-42D3-B5E7-16DD13F309D6}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6C10250F-FBB9-42D3-B5E7-16DD13F309D6}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6C10250F-FBB9-42D3-B5E7-16DD13F309D6}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FED4AAF-FD6D-4A39-9573-EAE2FE4225EF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FED4AAF-FD6D-4A39-9573-EAE2FE4225EF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FED4AAF-FD6D-4A39-9573-EAE2FE4225EF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FED4AAF-FD6D-4A39-9573-EAE2FE4225EF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

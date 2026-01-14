@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using WhatTheDob.Application.DTOs;
 using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.External;
 using WhatTheDob.Domain.Entities;
@@ -38,7 +39,7 @@ namespace WhatTheDob.Infrastructure.Services
             var fetchSettings = configuration.GetSection("MenuFetch");
 
             _daysToFetch = fetchSettings.GetValue<int>("DaysToFetch", 7);
-            _meals = fetchSettings.GetSection("Meals").Get<string[]>() ?? new[] { "Breakfast", "Lunch", "Dinner" };
+            _meals = fetchSettings.GetSection("Meals").Get<string[]>() ?? ["Breakfast", "Lunch", "Dinner"];
             _menuApiUrl = fetchSettings.GetValue<string>("MenuApiUrl", "https://www.absecom.psu.edu/menus/user-pages/daily-menu.cfm");
             _campusId = fetchSettings.GetValue<int>("SelectedCampus", 46);
 
@@ -47,8 +48,9 @@ namespace WhatTheDob.Infrastructure.Services
             _menuParser = menuParser;
             _menuFilterMapper = menuFilterMapper;
         }
-
-        public async Task<List<Menu>> MenuPagesSync()
+        // FetchMenusFromApiAsync fetches menu data from an external API, processes it, and stores it in the repository.
+        // It retrieves campus and meal options, iterates over the specified days (_daysToFetch). 
+        public async Task<List<Menu>> FetchMenusFromApiAsync()
         {
             var menus = new List<Menu>();
 
@@ -66,7 +68,8 @@ namespace WhatTheDob.Infrastructure.Services
                 }
             }
 
-            await _menuRepository.UpsertFiltersAsync(campusMap, mealOptions).ConfigureAwait(false);
+            await _menuRepository.UpsertCampusesAsync(campusMap).ConfigureAwait(false);
+            await _menuRepository.UpsertMealsAsync(mealOptions).ConfigureAwait(false);
 
             var campusIdsToProcess = campusMap.Keys.ToList();
 
@@ -119,7 +122,7 @@ namespace WhatTheDob.Infrastructure.Services
 
             return menus;
         }
-
+        // GetMenuAsync retrieves a menu for a specific date, campus, and meal from the repository and maps it to the domain entity.
         public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
         {
             var menuMappings = await _menuRepository.GetMenuMappingsAsync(date, campusId, mealId).ConfigureAwait(false);
@@ -142,6 +145,26 @@ namespace WhatTheDob.Infrastructure.Services
                 })]
             };
             return domainMenu;
+        }
+
+        public async Task<IEnumerable<CampusDto>> GetCampusesAsync()
+        {
+            var campuses = await _menuRepository.GetCampusesAsync().ConfigureAwait(false);
+            return campuses.Select(c => new CampusDto
+            {
+                Id = c.Id,
+                Value = c.Value
+            });
+        }
+
+        public async Task<IEnumerable<MealDto>> GetMealsAsync()
+        {
+            var meals = await _menuRepository.GetMealsAsync().ConfigureAwait(false);
+            return meals.Select(m => new MealDto
+            {
+                Id = m.Id,
+                Value = m.Value
+            });
         }
     }
 }

@@ -25,4 +25,8 @@
     <ProjectReference Include="..\WhatTheDob.Domain\WhatTheDob.Domain.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Services\BackgroundTasks\" />
+  </ItemGroup>
+
 </Project>

@@ -1,0 +1,182 @@
+@page "/"
+@rendermode InteractiveServer
+@inject IMenuService MenuService
+@using MenuModel = WhatTheDob.Domain.Entities.Menu
+@using WhatTheDob.Application.DTOs
+
+<PageTitle>Menu</PageTitle>
+
+<h1>Menu</h1>
+
+<section class="menu-filters">
+    <div class="filter-group">
+        <label for="dateInput">Date:</label>
+        <input id="dateInput" type="date" @bind="_selectedDate" class="form-control" />
+    </div>
+    
+    <div class="filter-group">
+        <label for="campusSelect">Campus:</label>
+        <select id="campusSelect" @bind="_selectedCampusId" class="form-select" disabled="@_isLoadingFilters">
+            <option value="">-- Select Campus --</option>
+            @foreach (var campus in _campuses)
+            {
+                <option value="@campus.Id">@campus.Value</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <label for="mealSelect">Meal:</label>
+        <select id="mealSelect" @bind="_selectedMealId" class="form-select" disabled="@_isLoadingFilters">
+            <option value="">-- Select Meal --</option>
+            @foreach (var meal in _meals)
+            {
+                <option value="@meal.Id">@meal.Value</option>
+            }
+        </select>
+    </div>
+    
+    <div class="filter-group">
+        <button type="button" @onclick="LoadMenuAsync" disabled="@(_isLoading || _isLoadingFilters)" class="btn btn-primary">
+            @if (_isLoading)
+            {
+                <span>Loading...</span>
+            }
+            else
+            {
+                <span>Load Menu</span>
+            }
+        </button>
+    </div>
+</section>
+
+@if (_isLoadingFilters)
+{
+    <p>Loading filters...</p>
+}
+else if (_isLoading)
+{
+    <p>Loading menu...</p>
+}
+else if (!string.IsNullOrEmpty(_errorMessage))
+{
+    <div class="alert alert-danger">@_errorMessage</div>
+}
+else if (_menu is null)
+{
+    <p>Select a date, campus, and meal, then click "Load Menu" to view the menu.</p>
+}
+else
+{
+
+    <section class="menu-items">
+        <h2>Items</h2>
+        @if (_menu.Items.Count == 0)
+        {
+            <p>No items were returned for this menu.</p>
+        }
+        else
+        {
+            @foreach (var category in _menu.Items.GroupBy(item => item.Category).OrderBy(g => g.Key))
+            {
+                <div class="menu-category">
+                    <h3 class="category-header">@category.Key</h3>
+                    <ul class="menu-item-list">
+                        @foreach (var item in category)
+                        {
+                            <li class="menu-item">
+                                <h4>@item.Value</h4>
+                                @if (item.Tags?.Count > 0)
+                                {
+                                    <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
+                                }
+                                <p><strong>Ratings:</strong> @item.TotalRating (Total) across @item.RatingCount vote(s)</p>
+                            </li>
+                        }
+                    </ul>
+                </div>
+            }
+        }
+    </section>
+}
+
+@code {
+    private MenuModel? _menu;
+    private bool _isLoading = false;
+    private bool _isLoadingFilters = true;
+    private string? _errorMessage;
+    
+    private List<CampusDto> _campuses = new();
+    private List<MealDto> _meals = new();
+    
+    private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Now);
+    private int? _selectedCampusId;
+    private int? _selectedMealId;
+
+    protected override async Task OnInitializedAsync()
+    {
+        try
+        {
+            var campusesTask = MenuService.GetCampusesAsync();
+            var mealsTask = MenuService.GetMealsAsync();
+            
+            await Task.WhenAll(campusesTask, mealsTask);
+            
+            _campuses = (await campusesTask).ToList();
+            _meals = (await mealsTask).ToList();
+            
+            if (_campuses.Any())
+            {
+                _selectedCampusId = _campuses.First().Id;
+            }
+            
+            if (_meals.Any())
+            {
+                _selectedMealId = _meals.First().Id;
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load filters: {ex.Message}";
+        }
+        finally
+        {
+            _isLoadingFilters = false;
+        }
+    }
+    
+    private async Task LoadMenuAsync()
+    {
+        if (!_selectedCampusId.HasValue || !_selectedMealId.HasValue)
+        {
+            _errorMessage = "Please select both a campus and a meal.";
+            StateHasChanged();
+            return;
+        }
+        
+        _isLoading = true;
+        _errorMessage = null;   
+        StateHasChanged();
+        
+        try
+        {
+            var formattedDate = _selectedDate.ToString("MM/dd/yy");
+            
+            _menu = await MenuService.GetMenuAsync(formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
+            
+            if (_menu is null)
+            {
+                _errorMessage = "No menu found for the selected date, campus, and meal.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to load menu: {ex.Message}";
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

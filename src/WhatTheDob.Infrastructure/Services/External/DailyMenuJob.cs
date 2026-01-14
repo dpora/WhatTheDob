@@ -27,7 +27,7 @@ namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
             using var scope = _scopeFactory.CreateScope();
             var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
             // var menus = await menuService.GetMenuAsync("1/", 46, 3);
-            //await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
+            await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
         }
 
         public void ScheduleMidnightTask()

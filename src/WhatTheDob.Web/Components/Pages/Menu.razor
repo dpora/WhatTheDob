@@ -1,4 +1,4 @@
-@page "/menu"
+@page "/"
 @rendermode InteractiveServer
 @inject IMenuService MenuService
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
@@ -68,11 +68,6 @@ else if (_menu is null)
 }
 else
 {
-    <section class="menu-metadata">
-        <p><strong>Date:</strong> @_menu.Date</p>
-        <p><strong>Meal Id:</strong> @_menu.Meal</p>
-        <p><strong>Campus Id:</strong> @_menu.CampusId</p>
-    </section>
 
     <section class="menu-items">
         <h2>Items</h2>

@@ -62,6 +62,9 @@ bld/
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 
+# Client-side libraries restored by tooling
+/src/WhatTheDob.Web/wwwroot/lib/
+
 # Database
 *.db
 *.db-shm

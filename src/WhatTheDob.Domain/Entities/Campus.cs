@@ -1,6 +1,6 @@
-namespace WhatTheDob.Application.DTOs
+namespace WhatTheDob.Domain.Entities
 {
-    public class CampusDto
+    public class Campus
     {
         public int Id { get; set; }
         public string Value { get; set; }

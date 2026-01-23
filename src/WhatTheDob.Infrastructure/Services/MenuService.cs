@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using WhatTheDob.Application.DTOs;
 using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.External;
 using WhatTheDob.Domain.Entities;
@@ -147,20 +146,20 @@ namespace WhatTheDob.Infrastructure.Services
             return domainMenu;
         }
 
-        public async Task<IEnumerable<CampusDto>> GetCampusesAsync()
+        public async Task<IEnumerable<Campus>> GetCampusesAsync()
         {
             var campuses = await _menuRepository.GetCampusesAsync().ConfigureAwait(false);
-            return campuses.Select(c => new CampusDto
+            return campuses.Select(c => new Campus
             {
                 Id = c.Id,
                 Value = c.Value
             });
         }
 
-        public async Task<IEnumerable<MealDto>> GetMealsAsync()
+        public async Task<IEnumerable<Meal>> GetMealsAsync()
         {
             var meals = await _menuRepository.GetMealsAsync().ConfigureAwait(false);
-            return meals.Select(m => new MealDto
+            return meals.Select(m => new Meal
             {
                 Id = m.Id,
                 Value = m.Value

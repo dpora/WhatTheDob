@@ -7,7 +7,7 @@ namespace WhatTheDob.Infrastructure.Interfaces.Mapping
     /// </summary>
     public interface IMenuFilterMapper
     {
-    Dictionary<string, string> ParseCampusOptions(string html);
+        Dictionary<string, string> ParseCampusOptions(string html);
         List<string> ParseMealOptions(string html);
     }
 }

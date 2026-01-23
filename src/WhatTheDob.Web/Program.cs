@@ -2,6 +2,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using System.IO;
 using WhatTheDob.Application.Interfaces.Services;
+using WhatTheDob.Application.Interfaces.Middleware;
 using WhatTheDob.Application.Interfaces.Services.BackgroundTasks;
 using WhatTheDob.Application.Interfaces.Services.External;
 using WhatTheDob.Infrastructure.Interfaces.Mapping;
@@ -88,8 +89,10 @@ if (app.Environment.IsDevelopment())
     await job.RunTaskAsync();
 }
 
-app.UseHttpsRedirection();
+// Use custom middleware to manage session cookies, i.e. session identifiers for users
+app.UseMiddleware<WhatTheDob.Infrastructure.Middleware.SessionCookieMiddleware>();
 
+app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 

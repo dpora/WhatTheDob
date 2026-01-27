@@ -1,8 +1,8 @@
 @page "/"
 @rendermode InteractiveServer
 @inject IMenuService MenuService
+@inject IHttpContextAccessor HttpContextAccessor
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
-@using WhatTheDob.Application.DTOs
 
 <PageTitle>Menu</PageTitle>
 
@@ -90,7 +90,32 @@ else
                                 {
                                     <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
                                 }
-                                <p><strong>Ratings:</strong> @item.TotalRating (Total) across @item.RatingCount vote(s)</p>
+                                <p><strong>Ratings:</strong> @(item.RatingCount == 0 ? "0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0")) (Total) across @item.RatingCount vote(s)</p>
+                                
+                                <div class="star-rating">
+                                    @{
+                                        var displayRating = GetDisplayRating(item);
+                                    }
+                                    @for (int i = 5; i >= 1; i--)
+                                    {
+                                        var starIndex = i;
+                                        var fillPercent = GetFillPercent(displayRating, starIndex);
+                                        var isPartial = fillPercent > 0 && fillPercent < 100;
+                                        var isFilled = fillPercent == 100;
+                                        
+                                        <button type="button" 
+                                                class="star-button @(isFilled ? "filled" : "") @(isPartial ? "partial" : "")"
+                                                style="@(isPartial ? $"--fill-percent: {fillPercent}%" : "")"
+                                                @onclick="() => SubmitRating(item.Value, starIndex)"
+                                                disabled="@_isSubmittingRating">
+                                            ★
+                                        </button>
+                                    }
+                                    @if (GetUserRating(item.Value) > 0)
+                                    {
+                                        <span class="user-rating-text">Your rating: @GetUserRating(item.Value)</span>
+                                    }
+                                </div>
                             </li>
                         }
                     </ul>
@@ -104,6 +129,7 @@ else
     private MenuModel? _menu;
     private bool _isLoading = false;
     private bool _isLoadingFilters = true;
+    private bool _isSubmittingRating = false;
     private string? _errorMessage;
     
     private List<Campus> _campuses = new();
@@ -112,9 +138,14 @@ else
     private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Now);
     private int? _selectedCampusId;
     private int? _selectedMealId;
+    
+    private Dictionary<string, int> _userRatings = new();
+    private string? _sessionId;
 
     protected override async Task OnInitializedAsync()
     {
+        _sessionId = HttpContextAccessor.HttpContext?.Request.Cookies["UserSessionId"];
+        
         try
         {
             var campusesTask = MenuService.GetCampusesAsync();
@@ -178,5 +209,72 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+    }
+    
+    private async Task SubmitRating(string itemValue, int rating)
+    {
+        if (string.IsNullOrEmpty(_sessionId))
+        {
+            _errorMessage = "Session ID not found. Please refresh the page.";
+            StateHasChanged();
+            return;
+        }
+        
+        _isSubmittingRating = true;
+        StateHasChanged();
+        
+        try
+        {
+            await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
+            
+            _userRatings[itemValue] = rating;
+            
+            if (_menu != null && _selectedCampusId.HasValue && _selectedMealId.HasValue)
+            {
+                var formattedDate = _selectedDate.ToString("MM/dd/yy");
+                _menu = await MenuService.GetMenuAsync(formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to submit rating: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingRating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private double GetDisplayRating(WhatTheDob.Domain.Entities.MenuItem item)
+    {
+        var userRating = GetUserRating(item.Value);
+        if (userRating > 0)
+        {
+            return (double)userRating;
+        }
+
+        if (item.RatingCount == 0)
+        {
+            return 0;
+        }
+        
+        return (double)item.TotalRating / item.RatingCount;
+    }
+    
+    private int GetFillPercent(double rating, int starIndex)
+    {
+        if (rating >= starIndex) return 100;
+        if (rating < starIndex - 1) return 0;
+        
+        // Example: rating 3.6. starIndex 4.
+        // 3.6 < 4.  3.6 >= 3.
+        // fill = 3.6 - 3 = 0.6 => 60%
+        return (int)((rating - (starIndex - 1)) * 100);
+    }
+
+    private int GetUserRating(string itemValue)
+    {
+        return _userRatings.TryGetValue(itemValue, out var rating) ? rating : 0;
     }
 }

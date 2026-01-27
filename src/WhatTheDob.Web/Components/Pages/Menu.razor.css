@@ -101,6 +101,66 @@
     font-size: 0.9rem;
 }
 
+.star-rating {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    margin-top: 0.75rem;
+    flex-direction: row-reverse;
+    justify-content: flex-end;
+}
+
+.star-button {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    color: #ddd;
+    cursor: pointer;
+    padding: 0;
+    transition: color 0.2s, transform 0.1s;
+}
+
+.star-button:hover:not(:disabled) {
+    color: #ffc107;
+    transform: scale(1.1);
+}
+
+.star-button:hover:not(:disabled) ~ .star-button {
+    color: #ffc107;
+}
+
+.star-button.filled {
+    color: #ffc107;
+}
+
+/* Partial star support */
+.star-button.partial {
+    background: linear-gradient(90deg, #ffc107 var(--fill-percent, 50%), #ddd var(--fill-percent, 50%));
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+}
+
+/* Ensure hover overrides partial styling */
+.star-button:hover:not(:disabled),
+.star-button:hover:not(:disabled) ~ .star-button {
+    background: none; 
+    -webkit-background-clip: border-box; 
+    color: #ffc107;
+}
+
+.star-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.user-rating-text {
+    margin-left: 0.5rem;
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-style: italic;
+}
+
 @media (max-width: 768px) {
     .menu-filters {
         flex-direction: column;

@@ -13,5 +13,6 @@ namespace WhatTheDob.Application.Interfaces.Services
         Task<List<Menu>> FetchMenusFromApiAsync();
         Task<IEnumerable<Campus>> GetCampusesAsync();
         Task<IEnumerable<Meal>> GetMealsAsync();
+        Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating);
     }
 }

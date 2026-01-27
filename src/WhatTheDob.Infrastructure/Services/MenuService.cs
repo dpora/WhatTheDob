@@ -125,7 +125,7 @@ namespace WhatTheDob.Infrastructure.Services
         public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
         {
             var menuMappings = await _menuRepository.GetMenuMappingsAsync(date, campusId, mealId).ConfigureAwait(false);
-            if (menuMappings == null)
+            if (!menuMappings.Any())
             {
                 return null;
             }
@@ -164,6 +164,11 @@ namespace WhatTheDob.Infrastructure.Services
                 Id = m.Id,
                 Value = m.Value
             });
+        }
+
+        public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
+        {
+            await _menuRepository.UpsertUserRatingAsync(sessionId, itemValue, rating).ConfigureAwait(false);
         }
     }
 }

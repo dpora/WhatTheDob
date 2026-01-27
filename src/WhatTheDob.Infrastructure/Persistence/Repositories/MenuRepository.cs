@@ -14,6 +14,7 @@ using PersistenceContext = WhatTheDob.Infrastructure.Persistence.WhatTheDobDbCon
 using PersistenceCategory = WhatTheDob.Infrastructure.Persistence.Models.Category;
 using PersistenceCampus = WhatTheDob.Infrastructure.Persistence.Models.Campus;
 using PersistenceItemRating = WhatTheDob.Infrastructure.Persistence.Models.ItemRating;
+using PersistenceUserRating = WhatTheDob.Infrastructure.Persistence.Models.UserRating;
 using PersistenceMeal = WhatTheDob.Infrastructure.Persistence.Models.Meal;
 using PersistenceMenu = WhatTheDob.Infrastructure.Persistence.Models.Menu;
 using PersistenceMenuItem = WhatTheDob.Infrastructure.Persistence.Models.MenuItem;
@@ -35,7 +36,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
         public async Task UpsertCampusesAsync(IDictionary<int, string> campuses, CancellationToken cancellationToken = default)
         {
-            if (campuses == null)
+            if (campuses.Count < 1)
             {
                 return;
             }
@@ -182,18 +183,72 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 .ConfigureAwait(false);
         }
 
-        public async Task UpsertItemRatingAsync(string itemValue, int rating, CancellationToken cancellationToken = default)
+        public async Task UpsertUserRatingAsync(string sessionId, string itemValue, int rating,
+            CancellationToken cancellationToken = default)
         {
             var itemRating = await _dbContext.ItemRatings
                 .AsTracking()
                 .FirstOrDefaultAsync(r => r.Value == itemValue.Trim(), cancellationToken)
                 .ConfigureAwait(false);
-            if (itemRating != null)
+
+            // If no item rating found, check to see if the menu item exists, and if so create the item rating
+            if (itemRating == null)
             {
+                var menuItem = await _dbContext.MenuItems
+                    .AsNoTracking()
+                    .FirstOrDefaultAsync(r => r.Value == itemValue.Trim(), cancellationToken)
+                    .ConfigureAwait(false);
+
+                if (menuItem != null)
+                {
+                    // User might be trying to rate an existing menu item that doesn't have a rating yet
+                    //TODO [ex] [log] throw ex and log
+                    return;
+                }
+
+                var itemRatingEntity = new PersistenceItemRating
+                {
+                    Value = itemValue.Trim(),
+                    TotalRating = rating,
+                    RatingCount = 1
+                };
+
+                _dbContext.ItemRatings.Add(itemRatingEntity);
+
+                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+
+                itemRating = itemRatingEntity;
+            }
+
+            var userRating = await _dbContext.UserRatings
+                .AsTracking()
+                .FirstOrDefaultAsync(r => r.ItemRatingId == itemRating.Id && r.SessionId == sessionId, cancellationToken)
+                .ConfigureAwait(false);
+            // If no existing user rating, create one
+            if (userRating == null)
+            {
+                var userRatingEntity = new PersistenceUserRating
+                {
+                    ItemRatingId = itemRating.Id,
+                    RatingValue = rating,
+                    SessionId = sessionId,
+                    CreatedAt = DateTime.UtcNow.ToString("o"),
+                    UpdatedAt = null
+                };
+                
+                _dbContext.UserRatings.Add(userRatingEntity);
+                
                 itemRating.TotalRating += rating;
                 itemRating.RatingCount += 1;
-                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             }
+            else // Update existing user rating and ItemRating aggregate
+            {
+                itemRating.TotalRating += (rating - userRating.RatingValue);
+
+                userRating.RatingValue = rating;
+                userRating.UpdatedAt = DateTime.UtcNow.ToString("o");
+            }
+            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private async Task UpsertMenuAsync(DomainMenu menu, CancellationToken cancellationToken)

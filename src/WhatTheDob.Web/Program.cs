@@ -21,6 +21,8 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddHttpContextAccessor();
+
 // Get data storage path from configuration
 var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:Path") ?? "datastorage";
 var repoRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."));
@@ -86,7 +88,7 @@ if (app.Environment.IsDevelopment())
 
     var job = scope.ServiceProvider.GetRequiredService<IDailyMenuJob>();
     job.ScheduleMidnightTask();
-    await job.RunTaskAsync();
+   // await job.RunTaskAsync();
 }
 
 // Use custom middleware to manage session cookies, i.e. session identifiers for users

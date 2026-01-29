@@ -45,6 +45,9 @@ namespace WhatTheDob.Infrastructure.Mapping
                             item.Value = link.GetAttributeValue("aria-label", "").Trim();
                         }
 
+                        if (string.IsNullOrEmpty(item.Value))
+                            continue; //Skip items without a valid name
+
                         //Get all <img> tags for tags
                         var imgNodes = node.SelectNodes(".//img");
                         if (imgNodes != null)

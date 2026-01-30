@@ -168,6 +168,25 @@ namespace WhatTheDob.Infrastructure.Services
 
         public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
         {
+            if (string.IsNullOrWhiteSpace(sessionId))
+            {
+                throw new ArgumentException("Session id is required.", nameof(sessionId));
+            }
+
+            if (string.IsNullOrWhiteSpace(itemValue))
+            {
+                throw new ArgumentException("Item value is required.", nameof(itemValue));
+            }
+
+            // Normalize values to avoid accidental duplicates due to whitespace/casing
+            sessionId = sessionId.Trim();
+            itemValue = itemValue.Trim();
+
+            if (rating < 1 || rating > 5)
+            {
+                throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
+            }
+
             await _menuRepository.UpsertUserRatingAsync(sessionId, itemValue, rating).ConfigureAwait(false);
         }
     }

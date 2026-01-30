@@ -92,7 +92,7 @@ if (app.Environment.IsDevelopment())
 }
 
 // Use custom middleware to manage session cookies, i.e. session identifiers for users
-app.UseMiddleware<WhatTheDob.Infrastructure.Middleware.SessionCookieMiddleware>();
+app.UseMiddleware<WhatTheDob.Web.Middleware.SessionCookieMiddleware>();
 
 app.UseHttpsRedirection();
 

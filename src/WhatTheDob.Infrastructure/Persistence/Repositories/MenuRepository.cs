@@ -199,11 +199,9 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     .FirstOrDefaultAsync(r => r.Value == itemValue.Trim(), cancellationToken)
                     .ConfigureAwait(false);
 
-                if (menuItem != null)
+                if (menuItem == null)
                 {
-                    // User might be trying to rate an existing menu item that doesn't have a rating yet
-                    //TODO [ex] [log] throw ex and log
-                    return;
+                    throw new ArgumentException("No menu items exist for specified item value");
                 }
 
                 var itemRatingEntity = new PersistenceItemRating

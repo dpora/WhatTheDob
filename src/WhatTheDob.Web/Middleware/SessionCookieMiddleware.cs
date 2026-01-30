@@ -2,7 +2,7 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
-namespace WhatTheDob.Infrastructure.Middleware
+namespace WhatTheDob.Web.Middleware
 {
     public class SessionCookieMiddleware
     {

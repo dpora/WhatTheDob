@@ -95,6 +95,8 @@ else
                                 <div class="star-rating">
                                     @{
                                         var displayRating = GetDisplayRating(item);
+                                        var userRating = GetUserRating(item.Value);
+                                        bool isUserRated = userRating > 0;
                                     }
                                     @for (int i = 5; i >= 1; i--)
                                     {
@@ -104,16 +106,16 @@ else
                                         var isFilled = fillPercent == 100;
                                         
                                         <button type="button" 
-                                                class="star-button @(isFilled ? "filled" : "") @(isPartial ? "partial" : "")"
+                                                class="star-button @(isUserRated && isFilled ? "user" : "") @(isFilled ? "filled" : "") @(isPartial ? "partial" : "")"
                                                 style="@(isPartial ? $"--fill-percent: {fillPercent}%" : "")"
                                                 @onclick="() => SubmitRating(item.Value, starIndex)"
                                                 disabled="@_isSubmittingRating">
                                             ★
                                         </button>
                                     }
-                                    @if (GetUserRating(item.Value) > 0)
+                                    @if (isUserRated)
                                     {
-                                        <span class="user-rating-text">Your rating: @GetUserRating(item.Value)</span>
+                                        <span class="user-rating-text">Your rating: @userRating</span>
                                     }
                                 </div>
                             </li>

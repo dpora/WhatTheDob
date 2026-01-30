@@ -130,12 +130,16 @@
 }
 
 .star-button.filled {
+    color: #bd951c;
+}
+
+.star-button.user {
     color: #ffc107;
 }
 
 /* Partial star support */
 .star-button.partial {
-    background: linear-gradient(90deg, #ffc107 var(--fill-percent, 50%), #ddd var(--fill-percent, 50%));
+    background: linear-gradient(90deg, #bd951c var(--fill-percent, 50%), #ddd var(--fill-percent, 50%));
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;

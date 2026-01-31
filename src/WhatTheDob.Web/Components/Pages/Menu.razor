@@ -2,6 +2,7 @@
 @rendermode InteractiveServer
 @inject IMenuService MenuService
 @inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime JS
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
 
 <PageTitle>Menu</PageTitle>
@@ -70,7 +71,6 @@ else
 {
 
     <section class="menu-items">
-        <h2>Items</h2>
         @if (_menu.Items.Count == 0)
         {
             <p>No items were returned for this menu.</p>
@@ -143,10 +143,12 @@ else
     
     private Dictionary<string, int> _userRatings = new();
     private string? _sessionId;
+    private const string RatingCookiePrefix = "wtd-ur-"; // user rating cookie prefix
 
     protected override async Task OnInitializedAsync()
     {
         _sessionId = HttpContextAccessor.HttpContext?.Request.Cookies["UserSessionId"];
+        LoadUserRatingsFromCookies();
         
         try
         {
@@ -230,6 +232,8 @@ else
             await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
             
             _userRatings[itemValue] = rating;
+            SaveUserRatingToCookies(itemValue, rating);
+            CleanupMismatchedRatingCookies();
             
             if (_menu != null && _selectedCampusId.HasValue && _selectedMealId.HasValue)
             {
@@ -278,5 +282,91 @@ else
     private int GetUserRating(string itemValue)
     {
         return _userRatings.TryGetValue(itemValue, out var rating) ? rating : 0;
+    }
+
+    private void LoadUserRatingsFromCookies()
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context == null) return;
+
+        var reqCookies = context.Request.Cookies;
+        foreach (var kvp in reqCookies)
+        {
+            // Ignore non rating cookies
+            var key = kvp.Key;
+            if (!key.StartsWith(RatingCookiePrefix, StringComparison.Ordinal)) continue;
+
+            // Ignore empty rating cookies
+            var raw = kvp.Value;
+            if (string.IsNullOrEmpty(raw)) continue;
+
+            var parts = raw.Split(':', 2);
+            if (parts.Length != 2) { DeleteCookie(key); continue; }
+
+            var cookieSessionId = parts[0];
+            if (string.IsNullOrEmpty(cookieSessionId) || cookieSessionId != _sessionId)
+            {
+                // Remove ratings for other sessions
+                DeleteCookie(key);
+                continue;
+            }
+
+            // Remove any irregular cookies
+            if (!int.TryParse(parts[1], out var rating) || rating < 1 || rating > 5)
+            {
+                DeleteCookie(key);
+                continue;
+            }
+
+            // Decode that b
+            var encodedItemValue = key.Substring(RatingCookiePrefix.Length);
+            var itemValue = System.Net.WebUtility.UrlDecode(encodedItemValue);
+            if (string.IsNullOrWhiteSpace(itemValue)) { DeleteCookie(key); continue; }
+
+            _userRatings[itemValue] = rating;
+        }
+    }
+
+    private void SaveUserRatingToCookies(string itemValue, int rating)
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (string.IsNullOrEmpty(_sessionId)) return;
+
+        var encodedItemValue = System.Net.WebUtility.UrlEncode(itemValue);
+        var key = RatingCookiePrefix + encodedItemValue;
+        var value = _sessionId + ":" + rating.ToString();
+
+        // Write cookie client-side
+        var isHttps = context?.Request?.IsHttps == true;
+        var secureFlag = isHttps ? "Secure; " : string.Empty;
+        var cookieString = $"{key}={value}; {secureFlag}SameSite=Lax; Path=/; Max-Age={(int)TimeSpan.FromDays(7).TotalSeconds}";
+        JS.InvokeVoidAsync("eval", $"document.cookie = '{cookieString.Replace("'", "\\'")}'");
+    }
+
+    // Removes any old cookies that don't match the current session ID
+    private void CleanupMismatchedRatingCookies()
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context == null) return;
+
+        foreach (var kvp in context.Request.Cookies)
+        {
+            var key = kvp.Key;
+            if (!key.StartsWith(RatingCookiePrefix, StringComparison.Ordinal)) continue;
+
+            var raw = kvp.Value;
+            var parts = raw.Split(':', 2);
+            if (parts.Length != 2 || parts[0] != _sessionId)
+            {
+                DeleteCookie(key);
+            }
+        }
+    }
+
+    private void DeleteCookie(string key)
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context == null) return;
+        context.Response.Cookies.Delete(key);
     }
 }

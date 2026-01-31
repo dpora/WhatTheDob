@@ -11,8 +11,4 @@
     <ProjectReference Include="..\WhatTheDob.Infrastructure\WhatTheDob.Infrastructure.csproj" />
   </ItemGroup>
 
-  <ItemGroup>
-    <Folder Include="Components\Shared\" />
-  </ItemGroup>
-
 </Project>

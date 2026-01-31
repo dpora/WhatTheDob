@@ -334,12 +334,13 @@ else
 
         var encodedItemValue = System.Net.WebUtility.UrlEncode(itemValue);
         var key = RatingCookiePrefix + encodedItemValue;
-        var value = _sessionId + ":" + rating.ToString();
+        var value = _sessionId + ":" + rating;
 
         // Write cookie client-side
         var isHttps = context?.Request?.IsHttps == true;
         var secureFlag = isHttps ? "Secure; " : string.Empty;
         var cookieString = $"{key}={value}; {secureFlag}SameSite=Lax; Path=/; Max-Age={(int)TimeSpan.FromDays(7).TotalSeconds}";
+        // Possibly look into better sanitization if issues arise
         JS.InvokeVoidAsync("eval", $"document.cookie = '{cookieString.Replace("'", "\\'")}'");
     }
 
@@ -355,6 +356,13 @@ else
             if (!key.StartsWith(RatingCookiePrefix, StringComparison.Ordinal)) continue;
 
             var raw = kvp.Value;
+
+            if (string.IsNullOrEmpty(raw))
+            {
+                DeleteCookie(key);
+                continue;
+            }
+
             var parts = raw.Split(':', 2);
             if (parts.Length != 2 || parts[0] != _sessionId)
             {
@@ -363,6 +371,7 @@ else
         }
     }
 
+    // May not run post server-side render, maybe run through js interop if it becomes a problem
     private void DeleteCookie(string key)
     {
         var context = HttpContextAccessor.HttpContext;

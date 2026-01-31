@@ -125,7 +125,7 @@ namespace WhatTheDob.Infrastructure.Services
         public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
         {
             var menuMappings = await _menuRepository.GetMenuMappingsAsync(date, campusId, mealId).ConfigureAwait(false);
-            if (!menuMappings.Any())
+            if (menuMappings == null || !menuMappings.Any())
             {
                 return null;
             }
@@ -168,26 +168,26 @@ namespace WhatTheDob.Infrastructure.Services
 
         public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
         {
-            if (string.IsNullOrWhiteSpace(sessionId))
-            {
-                throw new ArgumentException("Session id is required.", nameof(sessionId));
-            }
-
-            if (string.IsNullOrWhiteSpace(itemValue))
-            {
-                throw new ArgumentException("Item value is required.", nameof(itemValue));
-            }
-
             // Normalize values to avoid accidental duplicates due to whitespace/casing
-            sessionId = sessionId.Trim();
-            itemValue = itemValue.Trim();
+            var trimmedSessionId = sessionId?.Trim();
+            var trimmedItemValue = itemValue?.Trim();
+
+            if (string.IsNullOrWhiteSpace(trimmedSessionId))
+            {
+                throw new ArgumentException("Session id is required.", nameof(trimmedSessionId));
+            }
+
+            if (string.IsNullOrWhiteSpace(trimmedItemValue))
+            {
+                throw new ArgumentException("Item value is required.", nameof(trimmedItemValue));
+            }
 
             if (rating < 1 || rating > 5)
             {
                 throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
             }
 
-            await _menuRepository.UpsertUserRatingAsync(sessionId, itemValue, rating).ConfigureAwait(false);
+            await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
         }
     }
 }

@@ -31,7 +31,7 @@ namespace WhatTheDob.Web.Middleware
                 var options = new CookieOptions
                 {
                     HttpOnly = true,    // Prevents JavaScript access (good for XSS protection)
-                    Secure = true,      // Ensures cookie is only sent over HTTPS
+                    Secure = context.Request.IsHttps,      // Ensures cookie is only sent over HTTPS
                     SameSite = SameSiteMode.Strict, // Mitigates CSRF attacks
                     Expires = DateTimeOffset.UtcNow.AddDays(_daysToExpire) // From app settings
                 };

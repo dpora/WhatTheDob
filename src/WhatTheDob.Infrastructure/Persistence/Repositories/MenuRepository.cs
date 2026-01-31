@@ -36,7 +36,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
         public async Task UpsertCampusesAsync(IDictionary<int, string> campuses, CancellationToken cancellationToken = default)
         {
-            if (campuses.Count < 1)
+            if (campuses == null || campuses.Count < 1)
             {
                 return;
             }
@@ -192,6 +192,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 .ConfigureAwait(false);
 
             // If no item rating found, check to see if the menu item exists, and if so create the item rating
+            // Most likely will not happen as we are creating item ratings when creating menu items
             if (itemRating == null)
             {
                 var menuItem = await _dbContext.MenuItems
@@ -213,6 +214,8 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
                 _dbContext.ItemRatings.Add(itemRatingEntity);
 
+                // May lead to race condition if two users rate the same item simultaneously
+                // However, the likelihood is low and the impact is minimal (slightly inaccurate rating)
                 await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
                 itemRating = itemRatingEntity;

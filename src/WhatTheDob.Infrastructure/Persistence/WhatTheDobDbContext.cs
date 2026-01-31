@@ -30,6 +30,8 @@ public partial class WhatTheDobDbContext : DbContext
 
     public virtual DbSet<ItemRating> ItemRatings { get; set; }
 
+    public virtual DbSet<UserRating> UserRatings { get; set; }
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Campus>(entity =>
@@ -116,6 +118,22 @@ public partial class WhatTheDobDbContext : DbContext
             entity.Property(e => e.RatingCount).HasColumnName("RatingCount");
         });
 
+        modelBuilder.Entity<UserRating>(entity =>
+        {
+            entity.ToTable("UserRating");
+
+            entity.Property(e => e.Id).HasColumnName("ID");
+            entity.Property(e => e.RatingValue).HasColumnName("RatingValue");
+            entity.Property(e => e.SessionId).HasColumnName("SessionID");
+            entity.Property(e => e.CreatedAt).HasColumnName("CreatedAt");
+            entity.Property(e => e.UpdatedAt).HasColumnName("UpdatedAt");
+            entity.Property(e => e.ItemRatingId).HasColumnName("ItemRatingID");
+
+            entity.HasOne(d => d.ItemRating)
+                .WithMany()
+                .HasForeignKey(d => d.ItemRatingId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
 
         OnModelCreatingPartial(modelBuilder);
     }

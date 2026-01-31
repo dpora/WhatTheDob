@@ -1,8 +1,9 @@
 @page "/"
 @rendermode InteractiveServer
 @inject IMenuService MenuService
+@inject IHttpContextAccessor HttpContextAccessor
+@inject IJSRuntime JS
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
-@using WhatTheDob.Application.DTOs
 
 <PageTitle>Menu</PageTitle>
 
@@ -70,7 +71,6 @@ else
 {
 
     <section class="menu-items">
-        <h2>Items</h2>
         @if (_menu.Items.Count == 0)
         {
             <p>No items were returned for this menu.</p>
@@ -90,7 +90,34 @@ else
                                 {
                                     <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
                                 }
-                                <p><strong>Ratings:</strong> @item.TotalRating (Total) across @item.RatingCount vote(s)</p>
+                                <p><strong>Ratings:</strong> @(item.RatingCount == 0 ? "0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0")) (Total) across @item.RatingCount vote(s)</p>
+                                
+                                <div class="star-rating">
+                                    @{
+                                        var displayRating = GetDisplayRating(item);
+                                        var userRating = GetUserRating(item.Value);
+                                        bool isUserRated = userRating > 0;
+                                    }
+                                    @for (int i = 5; i >= 1; i--)
+                                    {
+                                        var starIndex = i;
+                                        var fillPercent = GetFillPercent(displayRating, starIndex);
+                                        var isPartial = fillPercent > 0 && fillPercent < 100;
+                                        var isFilled = fillPercent == 100;
+                                        
+                                        <button type="button" 
+                                                class="star-button @(isUserRated && isFilled ? "user" : "") @(isFilled ? "filled" : "") @(isPartial ? "partial" : "")"
+                                                style="@(isPartial ? $"--fill-percent: {fillPercent}%" : "")"
+                                                @onclick="() => SubmitRating(item.Value, starIndex)"
+                                                disabled="@_isSubmittingRating">
+                                            ★
+                                        </button>
+                                    }
+                                    @if (isUserRated)
+                                    {
+                                        <span class="user-rating-text">Your rating: @userRating</span>
+                                    }
+                                </div>
                             </li>
                         }
                     </ul>
@@ -104,6 +131,7 @@ else
     private MenuModel? _menu;
     private bool _isLoading = false;
     private bool _isLoadingFilters = true;
+    private bool _isSubmittingRating = false;
     private string? _errorMessage;
     
     private List<Campus> _campuses = new();
@@ -112,9 +140,16 @@ else
     private DateOnly _selectedDate = DateOnly.FromDateTime(DateTime.Now);
     private int? _selectedCampusId;
     private int? _selectedMealId;
+    
+    private Dictionary<string, int> _userRatings = new();
+    private string? _sessionId;
+    private const string RatingCookiePrefix = "wtd-ur-"; // user rating cookie prefix
 
     protected override async Task OnInitializedAsync()
     {
+        _sessionId = HttpContextAccessor.HttpContext?.Request.Cookies["UserSessionId"];
+        LoadUserRatingsFromCookies();
+        
         try
         {
             var campusesTask = MenuService.GetCampusesAsync();
@@ -178,5 +213,169 @@ else
             _isLoading = false;
             StateHasChanged();
         }
+    }
+    
+    private async Task SubmitRating(string itemValue, int rating)
+    {
+        if (string.IsNullOrEmpty(_sessionId))
+        {
+            _errorMessage = "Session ID not found. Please refresh the page.";
+            StateHasChanged();
+            return;
+        }
+        
+        _isSubmittingRating = true;
+        StateHasChanged();
+        
+        try
+        {
+            await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
+            
+            _userRatings[itemValue] = rating;
+            SaveUserRatingToCookies(itemValue, rating);
+            CleanupMismatchedRatingCookies();
+            
+            if (_menu != null && _selectedCampusId.HasValue && _selectedMealId.HasValue)
+            {
+                var formattedDate = _selectedDate.ToString("MM/dd/yy");
+                _menu = await MenuService.GetMenuAsync(formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
+            }
+        }
+        catch (Exception ex)
+        {
+            _errorMessage = $"Failed to submit rating: {ex.Message}";
+        }
+        finally
+        {
+            _isSubmittingRating = false;
+            StateHasChanged();
+        }
+    }
+    
+    private double GetDisplayRating(WhatTheDob.Domain.Entities.MenuItem item)
+    {
+        var userRating = GetUserRating(item.Value);
+        if (userRating > 0)
+        {
+            return (double)userRating;
+        }
+
+        if (item.RatingCount == 0)
+        {
+            return 0;
+        }
+        
+        return (double)item.TotalRating / item.RatingCount;
+    }
+    
+    private int GetFillPercent(double rating, int starIndex)
+    {
+        if (rating >= starIndex) return 100;
+        if (rating < starIndex - 1) return 0;
+        
+        // Example: rating 3.6. starIndex 4.
+        // 3.6 < 4.  3.6 >= 3.
+        // fill = 3.6 - 3 = 0.6 => 60%
+        return (int)((rating - (starIndex - 1)) * 100);
+    }
+
+    private int GetUserRating(string itemValue)
+    {
+        return _userRatings.TryGetValue(itemValue, out var rating) ? rating : 0;
+    }
+
+    private void LoadUserRatingsFromCookies()
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context == null) return;
+
+        var reqCookies = context.Request.Cookies;
+        foreach (var kvp in reqCookies)
+        {
+            // Ignore non rating cookies
+            var key = kvp.Key;
+            if (!key.StartsWith(RatingCookiePrefix, StringComparison.Ordinal)) continue;
+
+            // Ignore empty rating cookies
+            var raw = kvp.Value;
+            if (string.IsNullOrEmpty(raw)) continue;
+
+            var parts = raw.Split(':', 2);
+            if (parts.Length != 2) { DeleteCookie(key); continue; }
+
+            var cookieSessionId = parts[0];
+            if (string.IsNullOrEmpty(cookieSessionId) || cookieSessionId != _sessionId)
+            {
+                // Remove ratings for other sessions
+                DeleteCookie(key);
+                continue;
+            }
+
+            // Remove any irregular cookies
+            if (!int.TryParse(parts[1], out var rating) || rating < 1 || rating > 5)
+            {
+                DeleteCookie(key);
+                continue;
+            }
+
+            // Decode that b
+            var encodedItemValue = key.Substring(RatingCookiePrefix.Length);
+            var itemValue = System.Net.WebUtility.UrlDecode(encodedItemValue);
+            if (string.IsNullOrWhiteSpace(itemValue)) { DeleteCookie(key); continue; }
+
+            _userRatings[itemValue] = rating;
+        }
+    }
+
+    private void SaveUserRatingToCookies(string itemValue, int rating)
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (string.IsNullOrEmpty(_sessionId)) return;
+
+        var encodedItemValue = System.Net.WebUtility.UrlEncode(itemValue);
+        var key = RatingCookiePrefix + encodedItemValue;
+        var value = _sessionId + ":" + rating;
+
+        // Write cookie client-side
+        var isHttps = context?.Request?.IsHttps == true;
+        var secureFlag = isHttps ? "Secure; " : string.Empty;
+        var cookieString = $"{key}={value}; {secureFlag}SameSite=Lax; Path=/; Max-Age={(int)TimeSpan.FromDays(7).TotalSeconds}";
+        // Possibly look into better sanitization if issues arise
+        JS.InvokeVoidAsync("eval", $"document.cookie = '{cookieString.Replace("'", "\\'")}'");
+    }
+
+    // Removes any old cookies that don't match the current session ID
+    private void CleanupMismatchedRatingCookies()
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context == null) return;
+
+        foreach (var kvp in context.Request.Cookies)
+        {
+            var key = kvp.Key;
+            if (!key.StartsWith(RatingCookiePrefix, StringComparison.Ordinal)) continue;
+
+            var raw = kvp.Value;
+
+            if (string.IsNullOrEmpty(raw))
+            {
+                DeleteCookie(key);
+                continue;
+            }
+
+            var parts = raw.Split(':', 2);
+            if (parts.Length != 2 || parts[0] != _sessionId)
+            {
+                DeleteCookie(key);
+            }
+        }
+    }
+
+    // May not run post server-side render, maybe run through js interop if it becomes a problem
+    private void DeleteCookie(string key)
+    {
+        var context = HttpContextAccessor.HttpContext;
+        if (context == null) return;
+        context.Response.Cookies.Delete(key);
     }
 }

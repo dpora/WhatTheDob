@@ -125,7 +125,7 @@ namespace WhatTheDob.Infrastructure.Services
         public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
         {
             var menuMappings = await _menuRepository.GetMenuMappingsAsync(date, campusId, mealId).ConfigureAwait(false);
-            if (menuMappings == null)
+            if (menuMappings == null || !menuMappings.Any())
             {
                 return null;
             }
@@ -164,6 +164,30 @@ namespace WhatTheDob.Infrastructure.Services
                 Id = m.Id,
                 Value = m.Value
             });
+        }
+
+        public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
+        {
+            // Normalize values to avoid accidental duplicates due to whitespace/casing
+            var trimmedSessionId = sessionId?.Trim();
+            var trimmedItemValue = itemValue?.Trim();
+
+            if (string.IsNullOrWhiteSpace(trimmedSessionId))
+            {
+                throw new ArgumentException("Session id is required.", nameof(trimmedSessionId));
+            }
+
+            if (string.IsNullOrWhiteSpace(trimmedItemValue))
+            {
+                throw new ArgumentException("Item value is required.", nameof(trimmedItemValue));
+            }
+
+            if (rating < 1 || rating > 5)
+            {
+                throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
+            }
+
+            await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
         }
     }
 }

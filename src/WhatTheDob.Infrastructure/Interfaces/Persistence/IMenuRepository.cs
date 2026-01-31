@@ -37,6 +37,6 @@ namespace WhatTheDob.Infrastructure.Interfaces.Persistence
         Task<IEnumerable<PersistenceMenuMapping>> GetMenuMappingsAsync(string date, int campusId, int mealId, CancellationToken cancellationToken = default);
         
         // Item Rating Operations
-        Task UpsertItemRatingAsync(string itemValue, int rating, CancellationToken cancellationToken = default);
+        Task UpsertUserRatingAsync(string sessionId, string itemValue, int rating, CancellationToken cancellationToken = default);
     }
 }

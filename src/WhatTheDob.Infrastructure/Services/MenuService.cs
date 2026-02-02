@@ -121,6 +121,76 @@ namespace WhatTheDob.Infrastructure.Services
 
             return menus;
         }
+
+        // Overloaded FetchMenusFromApiAsync fetches menu data for a specific date from an external API, processes it, and stores it in the repository.
+        public async Task<List<Menu>> FetchMenusFromApiAsync(string date)
+        {
+            var menus = new List<Menu>();
+
+            var filterHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl).ConfigureAwait(false);
+
+            var campusOptionsRaw = _menuFilterMapper.ParseCampusOptions(filterHtml);
+            var mealOptions = _menuFilterMapper.ParseMealOptions(filterHtml);
+
+            var campusMap = new Dictionary<int, string>();
+            foreach (var option in campusOptionsRaw)
+            {
+                if (int.TryParse(option.Key, out var campusId))
+                {
+                    campusMap[campusId] = option.Value;
+                }
+            }
+
+            await _menuRepository.UpsertCampusesAsync(campusMap).ConfigureAwait(false);
+            await _menuRepository.UpsertMealsAsync(mealOptions).ConfigureAwait(false);
+
+            var campusIdsToProcess = campusMap.Keys.ToList();
+
+            if (campusIdsToProcess.Count == 0)
+            {
+                campusIdsToProcess.Add(_campusId);
+            }
+
+            var configuredMeals = new HashSet<string>(_meals, StringComparer.OrdinalIgnoreCase);
+            var mealsFromFilters = mealOptions
+                .Where(meal => !string.IsNullOrWhiteSpace(meal))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var mealsToProcess = mealsFromFilters.Count > 0
+                ? mealsFromFilters.Where(meal => configuredMeals.Count == 0 || configuredMeals.Contains(meal)).ToList()
+                : new List<string>(_meals);
+
+            if (mealsToProcess.Count == 0)
+            {
+                mealsToProcess.AddRange(_meals);
+            }
+
+            foreach (var campusId in campusIdsToProcess)
+            {
+                foreach (var meal in mealsToProcess)
+                {
+                    var menuHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl, date, meal, campusId).ConfigureAwait(false);
+
+                    if (!string.IsNullOrEmpty(menuHtml))
+                    {
+                        menus.Add(new Menu(
+                            date,
+                            meal,
+                            _menuParser.ParseMenuItems(menuHtml),
+                            campusId));
+                    }
+                }
+            }
+
+            if (menus.Count > 0)
+            {
+                await _menuRepository.UpsertMenusAsync(menus).ConfigureAwait(false);
+            }
+
+            return menus;
+        }
+
         // GetMenuAsync retrieves a menu for a specific date, campus, and meal from the repository and maps it to the domain entity.
         public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
         {

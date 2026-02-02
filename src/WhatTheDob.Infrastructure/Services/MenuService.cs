@@ -51,7 +51,6 @@ namespace WhatTheDob.Infrastructure.Services
         // It retrieves campus and meal options, iterates over the specified days (_daysToFetch). 
         public async Task<List<Menu>> FetchMenusFromApiAsync()
         {
-            var menus = new List<Menu>();
 
             var filterHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl).ConfigureAwait(false);
 
@@ -92,6 +91,8 @@ namespace WhatTheDob.Infrastructure.Services
                 mealsToProcess.AddRange(_meals);
             }
 
+            // Create a list to hold all the tasks then await them all at once
+            var menuTasks = new List<Task<Menu?>>();
             for (int i = 0; i < _daysToFetch; i++)
             {
                 var date = DateTime.Now.AddDays(i).ToString("MM/dd/yy");
@@ -100,19 +101,35 @@ namespace WhatTheDob.Infrastructure.Services
                 {
                     foreach (var meal in mealsToProcess)
                     {
-                        var menuHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl, date, meal, campusId).ConfigureAwait(false);
+                        // Capture loop variables to avoid closure issues
+                        var capturedDate = date;
+                        var capturedCampusId = campusId;
+                        var capturedMeal = meal;
 
-                        if (!string.IsNullOrEmpty(menuHtml))
+                        Console.WriteLine($"Adding Task: GetMenuDataAsync({_menuApiUrl}, {capturedDate}, {capturedMeal}, {capturedCampusId})");
+
+                        menuTasks.Add(Task.Run(async () =>
                         {
-                            menus.Add(new Menu(
-                                date,
-                                meal,
+                            var menuHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl, capturedDate, capturedMeal, capturedCampusId).ConfigureAwait(false);
+
+                            if (string.IsNullOrEmpty(menuHtml)) return null;
+
+                            return new Menu(
+                                capturedDate,
+                                capturedMeal,
                                 _menuParser.ParseMenuItems(menuHtml),
-                                campusId));
-                        }
+                                capturedCampusId);
+                        }));
                     }
                 }
             }
+
+            // Await all tasks concurrently
+            Console.WriteLine($"Awaiting {menuTasks.Count} menu tasks...");
+            var results = await Task.WhenAll(menuTasks).ConfigureAwait(false);
+
+            // Filter out nulls (failed requests or empty html)
+            var menus = results.OfType<Menu>().ToList();
 
             if (menus.Count > 0)
             {

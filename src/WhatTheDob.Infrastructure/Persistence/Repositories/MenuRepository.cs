@@ -131,10 +131,195 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
         public async Task UpsertMenusAsync(IEnumerable<DomainMenu> menus, CancellationToken cancellationToken = default)
         {
-            foreach (var menu in menus)
+            var menuList = menus.ToList();
+
+            if (menuList.Count == 0) return;
+
+            var strategy = _dbContext.Database.CreateExecutionStrategy();
+            await strategy.ExecuteAsync(async () =>
             {
-                await UpsertMenuAsync(menu, cancellationToken).ConfigureAwait(false);
-            }
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    var mealNames = menuList
+                        .Select(m => m.Meal)
+                        .Where(m => !string.IsNullOrWhiteSpace(m))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    var existingMeals = await _dbContext.Meals
+                        .Where(m => mealNames.Contains(m.Value))
+                        .ToDictionaryAsync(m => m.Value, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+
+                    // Bulk upsert categories
+                    var categoryNames = menuList
+                        .SelectMany(m => m.Items)
+                        .Select(i => i.Category?.Trim() ?? "Uncategorized")
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    var existingCategories = await _dbContext.Categories
+                        .Where(c => categoryNames.Contains(c.Value))
+                        .ToDictionaryAsync(c => c.Value, StringComparer.OrdinalIgnoreCase, cancellationToken);
+
+                    foreach (var name in categoryNames)
+                    {
+                        if (!existingCategories.ContainsKey(name))
+                        {
+                            var newCat = new PersistenceCategory { Value = name };
+                            _dbContext.Categories.Add(newCat);
+                            existingCategories[name] = newCat;
+                        }
+                    }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+
+                    // Bulk upsert item ratings
+                    var menuItemNames = menuList
+                        .SelectMany(m => m.Items)
+                        .Select(i => i.Value)
+                        .Where(x => !string.IsNullOrWhiteSpace(x))
+                        .Distinct(StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    // Chunking to avoid SQL parameter limit (2100) if many items
+                    var existingItemRatings = new Dictionary<string, PersistenceItemRating>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var chunk in menuItemNames.Chunk(2000))
+                    {
+                        var chunkRatings = await _dbContext.ItemRatings
+                            .Where(r => chunk.Contains(r.Value))
+                            .ToListAsync(cancellationToken);
+
+                        foreach (var r in chunkRatings) existingItemRatings[r.Value] = r;
+                    }
+
+                    foreach (var name in menuItemNames)
+                    {
+                        if (!existingCategories.ContainsKey(name))
+                        {
+                            var newRat = new PersistenceItemRating { Value = name, TotalRating = 0, RatingCount = 0 };
+                            _dbContext.ItemRatings.Add(newRat);
+                            existingItemRatings[name] = newRat;
+                        }
+                    }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+
+                    // Bulk upsert menu items now
+                    var existingMenuItems = new List<PersistenceMenuItem>();
+                    foreach (var chunk in menuItemNames.Chunk(2000))
+                    {
+                        existingMenuItems.AddRange(await _dbContext.MenuItems
+                            .Where(mi => chunk.Contains(mi.Value))
+                            .ToListAsync(cancellationToken));
+                    }
+
+                    // Key = Combined string or Tuple for lookup
+                    var menuItemMap = existingMenuItems
+                        .GroupBy(mi => (mi.Value.Trim().ToLower(), mi.CategoryId))
+                        .ToDictionary(g => g.Key, g => g.First());
+                    
+                    // Prepare lookup to ensuring no duplicates in this batch
+                    foreach (var domainMenu in menuList)
+                    {
+                        foreach (var domainItem in domainMenu.Items)
+                        {
+                            var val = domainItem.Value.Trim();
+                            var cat = domainItem.Category?.Trim() ?? "Uncategorized";
+                            var catId = existingCategories[cat].Id;
+                            var ratingId = existingItemRatings[val].Id;
+                            var tags = domainItem.Tags?.Any() == true ? string.Join(",", domainItem.Tags) : null;
+
+                            var key = (val.ToLower(), catId);
+
+                            if (menuItemMap.TryGetValue(key, out var existingItem))
+                            {
+                                // Update logic if needed (e.g. tags changed)
+                                if (existingItem.Tags != tags) existingItem.Tags = tags;
+                                if (existingItem.ItemRatingId != ratingId) existingItem.ItemRatingId = ratingId;
+                            }
+                            else
+                            {
+                                var newItem = new PersistenceMenuItem
+                                {
+                                    Value = val,
+                                    CategoryId = catId,
+                                    ItemRatingId = ratingId,
+                                    Tags = tags
+                                };
+                                _dbContext.MenuItems.Add(newItem);
+                                menuItemMap[key] = newItem; // Add to dictionary for subsequent lookups in this loop
+                            }
+                        }
+                    }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+                    // Bulk upsert Menus
+                    var dates = menuList.Select(m => m.Date).Distinct().ToList();
+                    var campusIds = menuList.Select(m => m.CampusId).Distinct().ToList();
+
+                    // Load existing menus matching date/campus context
+                    var existingMenus = await _dbContext.Menus
+                        .Where(m => dates.Contains(m.Date) && campusIds.Contains(m.CampusId))
+                        .ToListAsync(cancellationToken);
+
+                    var menuEntityMap = existingMenus
+                        .GroupBy(m => (m.Date, m.CampusId, m.MealId))
+                        .ToDictionary(g => g.Key, g => g.First());
+
+                    var menusToProcess = new List<(PersistenceMenu PMenu, DomainMenu DMenu)>();
+
+                    foreach (var dMenu in menuList)
+                    {
+                        var mealId = existingMeals[dMenu.Meal.Trim()].Id;
+                        var key = (dMenu.Date, dMenu.CampusId, mealId);
+
+                        if (!menuEntityMap.TryGetValue(key, out var pMenu))
+                        {
+                            pMenu = new PersistenceMenu
+                            {
+                                Date = dMenu.Date,
+                                CampusId = dMenu.CampusId,
+                                MealId = mealId
+                            };
+                            _dbContext.Menus.Add(pMenu);
+                            menuEntityMap[key] = pMenu;
+                        }
+                        menusToProcess.Add((pMenu, dMenu));
+                    }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+                    // Remove old mappings
+                    var menuIds = menusToProcess.Select(x => x.PMenu.Id).ToList();
+                    await _dbContext.MenuMappings.Where(mm => menuIds.Contains(mm.MenuId)).ExecuteDeleteAsync();
+
+                    // Add new mappings
+                    foreach (var (pMenu, dMenu) in menusToProcess)
+                    {
+                        foreach (var item in dMenu.Items)
+                        {
+                            var catId = existingCategories[item.Category?.Trim() ?? "Uncategorized"].Id;
+                            var key = (item.Value.Trim().ToLowerInvariant(), catId);
+                            var pItem = menuItemMap[key];
+
+                            _dbContext.MenuMappings.Add(new PersistenceMenuMapping
+                            {
+                                MenuId = pMenu.Id,
+                                MenuItemId = pItem.Id
+                            });
+                        }
+                    }
+                    await _dbContext.SaveChangesAsync(cancellationToken);
+
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+            });
         }
 
         public async Task<PersistenceMenu> GetMenuAsync(string date, int campusId, int mealId, CancellationToken cancellationToken = default)
@@ -250,81 +435,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 userRating.UpdatedAt = DateTime.UtcNow.ToString("o");
             }
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task UpsertMenuAsync(DomainMenu menu, CancellationToken cancellationToken)
-        {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-
-            var meal = await GetOrCreateMealAsync(menu.Meal, cancellationToken).ConfigureAwait(false);
-
-            var menuEntity = await _dbContext.Menus
-                .AsTracking()
-                .FirstOrDefaultAsync(m => m.Date == menu.Date && m.MealId == meal.Id && m.CampusId == menu.CampusId, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (menuEntity == null)
-            {
-                menuEntity = new PersistenceMenu
-                {
-                    Date = menu.Date,
-                    MealId = meal.Id,
-                    CampusId = menu.CampusId
-                };
-
-                _dbContext.Menus.Add(menuEntity);
-                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                var existingMappings = _dbContext.MenuMappings.Where(mapping => mapping.MenuId == menuEntity.Id);
-                _dbContext.MenuMappings.RemoveRange(existingMappings);
-                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            foreach (var item in menu.Items)
-            {
-                var category = await GetOrCreateCategoryAsync(item.Category, cancellationToken).ConfigureAwait(false);
-
-                var menuItemEntity = await _dbContext.MenuItems
-                    .AsTracking()
-                    .FirstOrDefaultAsync(mi => mi.Value == item.Value && mi.CategoryId == category.Id, cancellationToken)
-                    .ConfigureAwait(false);
-
-                var tags = item.Tags != null && item.Tags.Count > 0 ? string.Join(",", item.Tags) : null;
-
-                var itemRating = await GetOrCreateItemRatingAsync(item.Value, cancellationToken).ConfigureAwait(false);
-
-                if (menuItemEntity == null)
-                {
-                    menuItemEntity = new PersistenceMenuItem
-                    {
-                        Value = item.Value,
-                        Tags = tags,
-                        CategoryId = category.Id,
-                        ItemRatingId = itemRating.Id
-                    };
-
-                    _dbContext.MenuItems.Add(menuItemEntity);
-                    await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    menuItemEntity.Tags = tags;
-                    menuItemEntity.CategoryId = category.Id;
-                    menuItemEntity.ItemRatingId = itemRating.Id;
-                }
-
-                _dbContext.MenuMappings.Add(new PersistenceMenuMapping
-                {
-                    MenuId = menuEntity.Id,
-                    MenuItemId = menuItemEntity.Id
-                });
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<PersistenceMeal> GetOrCreateMealAsync(string mealName, CancellationToken cancellationToken)

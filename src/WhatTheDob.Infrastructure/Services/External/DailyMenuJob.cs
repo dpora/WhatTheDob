@@ -39,7 +39,7 @@ namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
 
             DateTime now = DateTime.Now;
             DateTime nextMidnight = now.Date.AddDays(1); // tomorrow 00:00
-            TimeSpan initialDelay = now - now;
+            TimeSpan initialDelay = now - nextMidnight;
             TimeSpan interval = TimeSpan.FromDays(1);
 
             _timer = new Timer(async _ => await RunTaskAsync(daysOffsetValue).ConfigureAwait(false), null, initialDelay, interval);

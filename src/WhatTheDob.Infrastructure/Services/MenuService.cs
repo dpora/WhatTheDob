@@ -158,31 +158,39 @@ namespace WhatTheDob.Infrastructure.Services
                 }
             }
 
-            await _menuRepository.UpsertCampusesAsync(campusMap).ConfigureAwait(false);
-            await _menuRepository.UpsertMealsAsync(mealOptions).ConfigureAwait(false);
-
-            var campusIdsToProcess = campusMap.Keys.ToList();
-
-            if (campusIdsToProcess.Count == 0)
+            async Task<(List<int> campusIdsToProcess, List<string> mealsToProcess)> InitializeCampusesAndMealsAsync()
             {
-                campusIdsToProcess.Add(_campusId);
+                await _menuRepository.UpsertCampusesAsync(campusMap).ConfigureAwait(false);
+                await _menuRepository.UpsertMealsAsync(mealOptions).ConfigureAwait(false);
+
+                var campusIdsToProcess = campusMap.Keys.ToList();
+
+                if (campusIdsToProcess.Count == 0)
+                {
+                    campusIdsToProcess.Add(_campusId);
+                }
+
+                var configuredMeals = new HashSet<string>(_meals, StringComparer.OrdinalIgnoreCase);
+                var mealsFromFilters = mealOptions
+                    .Where(meal => !string.IsNullOrWhiteSpace(meal))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var mealsToProcess = mealsFromFilters.Count > 0
+                    ? mealsFromFilters.Where(meal => configuredMeals.Count == 0 || configuredMeals.Contains(meal)).ToList()
+                    : new List<string>(_meals);
+
+                if (mealsToProcess.Count == 0)
+                {
+                    mealsToProcess.AddRange(_meals);
+                }
+
+                return (campusIdsToProcess, mealsToProcess);
             }
 
-            var configuredMeals = new HashSet<string>(_meals, StringComparer.OrdinalIgnoreCase);
-            var mealsFromFilters = mealOptions
-                .Where(meal => !string.IsNullOrWhiteSpace(meal))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            var mealsToProcess = mealsFromFilters.Count > 0
-                ? mealsFromFilters.Where(meal => configuredMeals.Count == 0 || configuredMeals.Contains(meal)).ToList()
-                : new List<string>(_meals);
-
-            if (mealsToProcess.Count == 0)
-            {
-                mealsToProcess.AddRange(_meals);
-            }
-
+            var initializationResult = await InitializeCampusesAndMealsAsync().ConfigureAwait(false);
+            var campusIdsToProcess = initializationResult.campusIdsToProcess;
+            var mealsToProcess = initializationResult.mealsToProcess;
             foreach (var campusId in campusIdsToProcess)
             {
                 foreach (var meal in mealsToProcess)

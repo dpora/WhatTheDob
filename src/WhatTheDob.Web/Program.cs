@@ -93,11 +93,14 @@ if (initialFetch)
     await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
 }
 
-// Schedule daily menu fetch task with specified days offset
-var daysOffsetValue = builder.Configuration.GetValue<int?>("MenuFetch:DaysToFetch") ?? 7;
+// Schedule daily menu fetch task.
+// NOTE: In this context, "MenuFetch:DaysToFetch" is interpreted as a *days offset* from today
+// (i.e. fetch the menu for the date 'today + offset'), not as "number of days to fetch".
+// The configuration key name is kept for backwards compatibility with existing deployments.
+var dailyFetchDaysOffset = builder.Configuration.GetValue<int?>("MenuFetch:DaysToFetch") ?? 7;
 var job = scope.ServiceProvider.GetRequiredService<IDailyMenuJob>();
-// Each day at midnight, fetch the menu for the date 'daysOffsetValue + today'
-job.ScheduleDailyTask(daysOffsetValue);
+// Each day at midnight, fetch the menu for the date 'dailyFetchDaysOffset + today'
+job.ScheduleDailyTask(dailyFetchDaysOffset);
 
 // Use custom middleware to manage session cookies, i.e. session identifiers for users
 app.UseMiddleware<WhatTheDob.Web.Middleware.SessionCookieMiddleware>();

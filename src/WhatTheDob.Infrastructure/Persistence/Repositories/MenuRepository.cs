@@ -163,14 +163,11 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         .Where(c => categoryNames.Contains(c.Value))
                         .ToDictionaryAsync(c => c.Value, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-                    foreach (var name in categoryNames)
+                    foreach (var name in categoryNames.Where(name => !existingCategories.ContainsKey(name)))
                     {
-                        if (!existingCategories.ContainsKey(name))
-                        {
-                            var newCat = new PersistenceCategory { Value = name };
-                            _dbContext.Categories.Add(newCat);
-                            existingCategories[name] = newCat;
-                        }
+                        var newCat = new PersistenceCategory { Value = name };
+                        _dbContext.Categories.Add(newCat);
+                        existingCategories[name] = newCat;
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 

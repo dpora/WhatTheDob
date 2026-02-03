@@ -178,7 +178,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     // Bulk upsert item ratings
                     var menuItemNames = menuList
                         .SelectMany(m => m.Items)
-                        .Select(i => i.Value)
+                        .Select(i => i.Value?.Trim())
                         .Where(x => !string.IsNullOrWhiteSpace(x))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();

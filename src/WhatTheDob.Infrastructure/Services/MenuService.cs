@@ -150,12 +150,13 @@ namespace WhatTheDob.Infrastructure.Services
             var mealOptions = _menuFilterMapper.ParseMealOptions(filterHtml);
 
             var campusMap = new Dictionary<int, string>();
-            foreach (var option in campusOptionsRaw)
+            var validCampusOptions = campusOptionsRaw
+                .Where(option => int.TryParse(option.Key, out _));
+
+            foreach (var option in validCampusOptions)
             {
-                if (int.TryParse(option.Key, out var campusId))
-                {
-                    campusMap[campusId] = option.Value;
-                }
+                var campusId = int.Parse(option.Key);
+                campusMap[campusId] = option.Value;
             }
 
             async Task<(List<int> campusIdsToProcess, List<string> mealsToProcess)> InitializeCampusesAndMealsAsync()

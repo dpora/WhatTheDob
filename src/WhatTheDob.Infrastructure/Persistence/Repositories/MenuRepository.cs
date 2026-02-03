@@ -228,7 +228,19 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                             var val = domainItem.Value.Trim();
                             var cat = domainItem.Category?.Trim() ?? "Uncategorized";
                             var catId = existingCategories[cat].Id;
-                            var ratingId = existingItemRatings[val].Id;
+                            if (!existingItemRatings.TryGetValue(val, out var itemRating))
+                            {
+                                // Fallback to a more tolerant lookup (handles trimming/case differences)
+                                itemRating = existingItemRatings
+                                    .FirstOrDefault(kvp => string.Equals(kvp.Key?.Trim(), val, StringComparison.OrdinalIgnoreCase))
+                                    .Value;
+                                if (itemRating == null)
+                                {
+                                    // If no matching rating can be found, skip this item to avoid KeyNotFoundException
+                                    continue;
+                                }
+                            }
+                            var ratingId = itemRating.Id;
                             var tags = domainItem.Tags?.Any() == true ? string.Join(",", domainItem.Tags) : null;
 
                             var key = (val.ToLower(), catId);

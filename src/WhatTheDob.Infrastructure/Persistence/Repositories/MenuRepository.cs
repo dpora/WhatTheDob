@@ -191,14 +191,11 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         foreach (var r in chunkRatings) existingItemRatings[r.Value] = r;
                     }
 
-                    foreach (var name in menuItemNames)
+                    foreach (var name in menuItemNames.Where(name => !existingCategories.ContainsKey(name)))
                     {
-                        if (!existingCategories.ContainsKey(name))
-                        {
-                            var newRat = new PersistenceItemRating { Value = name, TotalRating = 0, RatingCount = 0 };
-                            _dbContext.ItemRatings.Add(newRat);
-                            existingItemRatings[name] = newRat;
-                        }
+                        var newRat = new PersistenceItemRating { Value = name, TotalRating = 0, RatingCount = 0 };
+                        _dbContext.ItemRatings.Add(newRat);
+                        existingItemRatings[name] = newRat;
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 

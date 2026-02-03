@@ -110,15 +110,23 @@ namespace WhatTheDob.Infrastructure.Services
 
                         menuTasks.Add(Task.Run(async () =>
                         {
-                            var menuHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl, capturedDate, capturedMeal, capturedCampusId).ConfigureAwait(false);
+                            try
+                            {
+                                var menuHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl, capturedDate, capturedMeal, capturedCampusId).ConfigureAwait(false);
 
-                            if (string.IsNullOrEmpty(menuHtml)) return null;
+                                if (string.IsNullOrEmpty(menuHtml)) return null;
 
-                            return new Menu(
-                                capturedDate,
-                                capturedMeal,
-                                _menuParser.ParseMenuItems(menuHtml),
-                                capturedCampusId);
+                                return new Menu(
+                                    capturedDate,
+                                    capturedMeal,
+                                    _menuParser.ParseMenuItems(menuHtml),
+                                    capturedCampusId);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine($"Error fetching menu for Date={capturedDate}, Meal={capturedMeal}, Campus={capturedCampusId}: {ex.Message}");
+                                return null;
+                            }
                         }));
                     }
                 }

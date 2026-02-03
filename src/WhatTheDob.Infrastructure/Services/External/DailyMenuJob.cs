@@ -21,16 +21,16 @@ namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
             _scopeFactory = scopeFactory;
         }
 
-        public async Task RunTaskAsync()
+        public async Task RunTaskAsync(int daysOffsetValue)
         {
+            var dateToFetch = DateTime.Now.AddDays(daysOffsetValue).ToString("MM/dd/yy");
             Console.WriteLine("Scheduled task running at: " + DateTime.Now);
             using var scope = _scopeFactory.CreateScope();
             var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
-            // var menus = await menuService.GetMenuAsync("1/", 46, 3);
-            await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
+            await menuService.FetchMenusFromApiAsync(dateToFetch).ConfigureAwait(false);
         }
 
-        public void ScheduleMidnightTask()
+        public void ScheduleDailyTask(int daysOffsetValue)
         {
             if (_timer != null)
             {
@@ -42,7 +42,7 @@ namespace WhatTheDob.Infrastructure.Services.BackgroundTasks
             TimeSpan initialDelay = nextMidnight - now;
             TimeSpan interval = TimeSpan.FromDays(1);
 
-            _timer = new Timer(async _ => await RunTaskAsync().ConfigureAwait(false), null, initialDelay, interval);
+            _timer = new Timer(async _ => await RunTaskAsync(daysOffsetValue).ConfigureAwait(false), null, initialDelay, interval);
 
             Console.WriteLine("First run at: " + nextMidnight);
         }

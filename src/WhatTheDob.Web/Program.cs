@@ -63,32 +63,44 @@ if (!app.Environment.IsDevelopment())
     app.UseHsts();
 }
 
-if (app.Environment.IsDevelopment())
+// Create DB if it doesn't exist
+using var scope = app.Services.CreateScope();
+var db = scope.ServiceProvider.GetRequiredService<WhatTheDobDbContext>();
+
+// Ensure the database directory exists
+var dbConnection = db.Database.GetConnectionString();
+if (!string.IsNullOrWhiteSpace(dbConnection))
 {
-    using var scope = app.Services.CreateScope();
-    var db = scope.ServiceProvider.GetRequiredService<WhatTheDobDbContext>();
+    var connBuilder = new SqliteConnectionStringBuilder(dbConnection);
+    var dbPath = connBuilder.DataSource;
     
-    // Ensure the database directory exists
-    var dbConnection = db.Database.GetConnectionString();
-    if (!string.IsNullOrWhiteSpace(dbConnection))
+    var directory = Path.GetDirectoryName(dbPath);
+    if (!string.IsNullOrEmpty(directory))
     {
-        var connBuilder = new SqliteConnectionStringBuilder(dbConnection);
-        var dbPath = connBuilder.DataSource;
-        
-        var directory = Path.GetDirectoryName(dbPath);
-        if (!string.IsNullOrEmpty(directory))
-        {
-            Directory.CreateDirectory(directory);
-        }
+        Directory.CreateDirectory(directory);
     }
-
-    // Ensure the database is created
-    await db.Database.EnsureCreatedAsync();
-
-    var job = scope.ServiceProvider.GetRequiredService<IDailyMenuJob>();
-    job.ScheduleMidnightTask();
-   // await job.RunTaskAsync();
 }
+
+// Ensure the database is created
+await db.Database.EnsureCreatedAsync();
+
+// Check if initial fetch is required
+var initialFetch = builder.Configuration.GetValue<bool?>("MenuFetch:InitialFetch") ?? false;
+if (initialFetch)
+{
+    // Grab all menus from API on startup and insert into DB
+    var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
+    await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
+}
+
+// Schedule daily menu fetch task.
+// NOTE: In this context, "MenuFetch:DaysToFetch" is interpreted as a *days offset* from today
+// (i.e. fetch the menu for the date 'today + offset'), not as "number of days to fetch".
+// The configuration key name is kept for backwards compatibility with existing deployments.
+var dailyFetchDaysOffset = builder.Configuration.GetValue<int?>("MenuFetch:DaysToFetch") ?? 7;
+var job = scope.ServiceProvider.GetRequiredService<IDailyMenuJob>();
+// Each day at midnight, fetch the menu for the date 'dailyFetchDaysOffset + today'
+job.ScheduleDailyTask(dailyFetchDaysOffset);
 
 // Use custom middleware to manage session cookies, i.e. session identifiers for users
 app.UseMiddleware<WhatTheDob.Web.Middleware.SessionCookieMiddleware>();

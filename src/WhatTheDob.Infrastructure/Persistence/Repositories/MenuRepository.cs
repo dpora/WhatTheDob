@@ -163,14 +163,11 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         .Where(c => categoryNames.Contains(c.Value))
                         .ToDictionaryAsync(c => c.Value, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-                    foreach (var name in categoryNames)
+                    foreach (var name in categoryNames.Where(name => !existingCategories.ContainsKey(name)))
                     {
-                        if (!existingCategories.ContainsKey(name))
-                        {
-                            var newCat = new PersistenceCategory { Value = name };
-                            _dbContext.Categories.Add(newCat);
-                            existingCategories[name] = newCat;
-                        }
+                        var newCat = new PersistenceCategory { Value = name };
+                        _dbContext.Categories.Add(newCat);
+                        existingCategories[name] = newCat;
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -178,7 +175,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     // Bulk upsert item ratings
                     var menuItemNames = menuList
                         .SelectMany(m => m.Items)
-                        .Select(i => i.Value)
+                        .Select(i => i.Value?.Trim())
                         .Where(x => !string.IsNullOrWhiteSpace(x))
                         .Distinct(StringComparer.OrdinalIgnoreCase)
                         .ToList();
@@ -194,14 +191,11 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         foreach (var r in chunkRatings) existingItemRatings[r.Value] = r;
                     }
 
-                    foreach (var name in menuItemNames)
+                    foreach (var name in menuItemNames.Where(name => !existingItemRatings.ContainsKey(name)))
                     {
-                        if (!existingItemRatings.ContainsKey(name))
-                        {
-                            var newRat = new PersistenceItemRating { Value = name, TotalRating = 0, RatingCount = 0 };
-                            _dbContext.ItemRatings.Add(newRat);
-                            existingItemRatings[name] = newRat;
-                        }
+                        var newRat = new PersistenceItemRating { Value = name, TotalRating = 0, RatingCount = 0 };
+                        _dbContext.ItemRatings.Add(newRat);
+                        existingItemRatings[name] = newRat;
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -220,7 +214,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         .GroupBy(mi => (mi.Value.Trim().ToLower(), mi.CategoryId))
                         .ToDictionary(g => g.Key, g => g.First());
                     
-                    // Prepare lookup to ensure no duplicates in this batch
+                    // Prepare lookup to ensuring no duplicates in this batch
                     foreach (var domainMenu in menuList)
                     {
                         foreach (var domainItem in domainMenu.Items)
@@ -228,7 +222,19 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                             var val = domainItem.Value.Trim();
                             var cat = domainItem.Category?.Trim() ?? "Uncategorized";
                             var catId = existingCategories[cat].Id;
-                            var ratingId = existingItemRatings[val].Id;
+                            if (!existingItemRatings.TryGetValue(val, out var itemRating))
+                            {
+                                // Fallback to a more tolerant lookup (handles trimming/case differences)
+                                itemRating = existingItemRatings
+                                    .FirstOrDefault(kvp => string.Equals(kvp.Key?.Trim(), val, StringComparison.OrdinalIgnoreCase))
+                                    .Value;
+                                if (itemRating == null)
+                                {
+                                    // If no matching rating can be found, skip this item to avoid KeyNotFoundException
+                                    continue;
+                                }
+                            }
+                            var ratingId = itemRating.Id;
                             var tags = domainItem.Tags?.Any() == true ? string.Join(",", domainItem.Tags) : null;
 
                             var key = (val.ToLower(), catId);
@@ -292,7 +298,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
                     // Remove old mappings
                     var menuIds = menusToProcess.Select(x => x.PMenu.Id).ToList();
-                    await _dbContext.MenuMappings.Where(mm => menuIds.Contains(mm.MenuId)).ExecuteDeleteAsync(cancellationToken);
+                    await _dbContext.MenuMappings.Where(mm => menuIds.Contains(mm.MenuId)).ExecuteDeleteAsync();
 
                     // Add new mappings
                     foreach (var (pMenu, dMenu) in menusToProcess)
@@ -300,7 +306,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         foreach (var item in dMenu.Items)
                         {
                             var catId = existingCategories[item.Category?.Trim() ?? "Uncategorized"].Id;
-                            var key = (item.Value.Trim().ToLower(), catId);
+                            var key = (item.Value.Trim().ToLowerInvariant(), catId);
                             var pItem = menuItemMap[key];
 
                             _dbContext.MenuMappings.Add(new PersistenceMenuMapping
@@ -435,81 +441,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 userRating.UpdatedAt = DateTime.UtcNow.ToString("o");
             }
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task UpsertMenuAsync(DomainMenu menu, CancellationToken cancellationToken)
-        {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken).ConfigureAwait(false);
-
-            var meal = await GetOrCreateMealAsync(menu.Meal, cancellationToken).ConfigureAwait(false);
-
-            var menuEntity = await _dbContext.Menus
-                .AsTracking()
-                .FirstOrDefaultAsync(m => m.Date == menu.Date && m.MealId == meal.Id && m.CampusId == menu.CampusId, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (menuEntity == null)
-            {
-                menuEntity = new PersistenceMenu
-                {
-                    Date = menu.Date,
-                    MealId = meal.Id,
-                    CampusId = menu.CampusId
-                };
-
-                _dbContext.Menus.Add(menuEntity);
-                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-            else
-            {
-                var existingMappings = _dbContext.MenuMappings.Where(mapping => mapping.MenuId == menuEntity.Id);
-                _dbContext.MenuMappings.RemoveRange(existingMappings);
-                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-            }
-
-            foreach (var item in menu.Items)
-            {
-                var category = await GetOrCreateCategoryAsync(item.Category, cancellationToken).ConfigureAwait(false);
-
-                var menuItemEntity = await _dbContext.MenuItems
-                    .AsTracking()
-                    .FirstOrDefaultAsync(mi => mi.Value == item.Value && mi.CategoryId == category.Id, cancellationToken)
-                    .ConfigureAwait(false);
-
-                var tags = item.Tags != null && item.Tags.Count > 0 ? string.Join(",", item.Tags) : null;
-
-                var itemRating = await GetOrCreateItemRatingAsync(item.Value, cancellationToken).ConfigureAwait(false);
-
-                if (menuItemEntity == null)
-                {
-                    menuItemEntity = new PersistenceMenuItem
-                    {
-                        Value = item.Value,
-                        Tags = tags,
-                        CategoryId = category.Id,
-                        ItemRatingId = itemRating.Id
-                    };
-
-                    _dbContext.MenuItems.Add(menuItemEntity);
-                    await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-                }
-                else
-                {
-                    menuItemEntity.Tags = tags;
-                    menuItemEntity.CategoryId = category.Id;
-                    menuItemEntity.ItemRatingId = itemRating.Id;
-                }
-
-                _dbContext.MenuMappings.Add(new PersistenceMenuMapping
-                {
-                    MenuId = menuEntity.Id,
-                    MenuItemId = menuItemEntity.Id
-                });
-            }
-
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            await transaction.CommitAsync(cancellationToken).ConfigureAwait(false);
         }
 
         private async Task<PersistenceMeal> GetOrCreateMealAsync(string mealName, CancellationToken cancellationToken)

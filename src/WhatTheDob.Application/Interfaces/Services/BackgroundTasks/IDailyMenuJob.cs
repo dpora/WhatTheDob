@@ -8,8 +8,8 @@ namespace WhatTheDob.Application.Interfaces.Services.BackgroundTasks
 {
     public interface IDailyMenuJob
     {
-        Task RunTaskAsync(int daysOffsetValue);
+        Task RunTaskAsync();
 
-        void ScheduleDailyTask(int daysOffsetValue);
+        void ScheduleMidnightTask();
     }
 }

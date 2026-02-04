@@ -1,3 +1,21 @@
+/* In app.css - add at the top */
+:root {
+    --color-primary: #1b6ec2;
+    --color-primary-border: #1861ac;
+    --color-link: #006bb7;
+    --color-error: #e50000;
+    --color-success: #26b050;
+    --color-text: #212529;
+    --color-text-muted: #6c757d;
+    --color-border: #000000;
+    --color-accent: #3db8f5;
+    --color-star: #ffc107;
+    --color-star-filled: #bd951c;
+    --shadow-offset: 7px;
+    --border-radius-sm: 10px;
+    --border-radius-md: 15px;
+}
+
 html, body {
     font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }

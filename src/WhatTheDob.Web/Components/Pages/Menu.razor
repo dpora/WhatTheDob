@@ -7,7 +7,7 @@
 
 <PageTitle>Menu</PageTitle>
 
-<section class="menu-filters">
+<section class="menu-filters card-style-lg">
     <div class="filter-group">
         <label for="dateInput">DATE</label>
         <input id="dateInput" type="date" @bind="_selectedDate" class="form-control" />
@@ -34,12 +34,17 @@
             }
         </select>
     </div>
-    
     <div class="filter-group">
-        <LoadMenuButton IsLoading="_isLoading"
-                         Disabled="@(_isLoading || _isLoadingFilters)"
-                         OnClick="LoadMenuAsync"
-                         Text="Load Menu" />
+        <button type="button" @onclick="LoadMenuAsync" disabled="@(_isLoading || _isLoadingFilters)" class="card-style-md">
+            @if (_isLoading)
+            {
+                <span>Loading...</span>
+            }
+            else
+            {
+                <span>Load Menu</span>
+            }
+        </button>
     </div>
 </section>
 
@@ -76,7 +81,7 @@ else
                     <ul class="menu-item-list">
                         @foreach (var item in category)
                         {
-                            <li class="menu-item">
+                            <li class="menu-item card-style-lg">
                                 <h4>@item.Value</h4>
                                 @if (item.Tags?.Count > 0)
                                 {

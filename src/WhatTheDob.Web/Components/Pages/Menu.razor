@@ -7,16 +7,14 @@
 
 <PageTitle>Menu</PageTitle>
 
-<h1>Menu</h1>
-
 <section class="menu-filters">
     <div class="filter-group">
-        <label for="dateInput">Date:</label>
+        <label for="dateInput">DATE</label>
         <input id="dateInput" type="date" @bind="_selectedDate" class="form-control" />
     </div>
     
     <div class="filter-group">
-        <label for="campusSelect">Campus:</label>
+        <label for="campusSelect">CAMPUS</label>
         <select id="campusSelect" @bind="_selectedCampusId" class="form-select" disabled="@_isLoadingFilters">
             <option value="">-- Select Campus --</option>
             @foreach (var campus in _campuses)
@@ -27,7 +25,7 @@
     </div>
     
     <div class="filter-group">
-        <label for="mealSelect">Meal:</label>
+        <label for="mealSelect">MEAL</label>
         <select id="mealSelect" @bind="_selectedMealId" class="form-select" disabled="@_isLoadingFilters">
             <option value="">-- Select Meal --</option>
             @foreach (var meal in _meals)
@@ -38,16 +36,10 @@
     </div>
     
     <div class="filter-group">
-        <button type="button" @onclick="LoadMenuAsync" disabled="@(_isLoading || _isLoadingFilters)" class="btn btn-primary">
-            @if (_isLoading)
-            {
-                <span>Loading...</span>
-            }
-            else
-            {
-                <span>Load Menu</span>
-            }
-        </button>
+        <LoadMenuButton IsLoading="_isLoading"
+                         Disabled="@(_isLoading || _isLoadingFilters)"
+                         OnClick="LoadMenuAsync"
+                         Text="Load Menu" />
     </div>
 </section>
 

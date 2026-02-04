@@ -3,8 +3,10 @@
     gap: 1rem;
     margin-bottom: 2rem;
     padding: 1.5rem;
-    background-color: #f8f9fa;
-    border-radius: 0.5rem;
+    border: 3px solid #000000;
+    border-radius: 15px;
+    box-shadow: 7px 7px #000000;
+    background-color: #3db8f5;
     flex-wrap: wrap;
     align-items: flex-end;
 }
@@ -12,20 +14,20 @@
 .filter-group {
     display: flex;
     flex-direction: column;
-    gap: 0.5rem;
     min-width: 200px;
 }
 
-.filter-group label {
-    font-weight: 500;
-    margin-bottom: 0.25rem;
-}
+    .filter-group label {
+        font-family: sans-serif;
+        font-weight: 700;
+
+    }
 
 .filter-group input,
 .filter-group select {
     padding: 0.5rem;
-    border: 1px solid #ced4da;
-    border-radius: 0.25rem;
+    border: 3px solid #000000;
+    border-radius: 10px;
 }
 
 .filter-group button {
@@ -72,15 +74,11 @@
 .menu-item {
     padding: 1rem;
     border: 3px solid #000000;
-    border-radius: 1rem;
+    border-radius: 15px;
     box-shadow: 7px 7px #000000;
     /*will need to be dynamic based on category*/
     background-color: #fff;
 }
-
-/*.menu-item:hover {
-    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}*/
 
 .menu-item h3 {
     margin-top: 0;

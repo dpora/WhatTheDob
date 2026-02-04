@@ -10,7 +10,10 @@ namespace WhatTheDob.Application.Interfaces.Services
     public interface IMenuService
     {
         Task<Menu> GetMenuAsync(string date, int campusId, int mealId);
+        // Fetch all available menus from external API
         Task<List<Menu>> FetchMenusFromApiAsync();
+        // Fetch all menus from external API by specific date
+        Task<List<Menu>> FetchMenusFromApiAsync(string date);
         Task<IEnumerable<Campus>> GetCampusesAsync();
         Task<IEnumerable<Meal>> GetMealsAsync();
         Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating);

@@ -3,6 +3,7 @@
 @inject IMenuService MenuService
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IJSRuntime JS
+@inject IConfiguration Configuration
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
 
 <PageTitle>Menu</PageTitle>
@@ -19,7 +20,7 @@
             <option value="">-- Select Campus --</option>
             @foreach (var campus in _campuses)
             {
-                <option value="@campus.Id">@campus.Value</option>
+                <option value="@campus.Id">@FormatCampusName(campus.Value)</option>
             }
         </select>
     </div>
@@ -85,7 +86,12 @@ else
                                 <h4>@item.Value</h4>
                                 @if (item.Tags?.Count > 0)
                                 {
-                                    <p><strong>Tags:</strong> @string.Join(", ", item.Tags)</p>
+                                    <div class="tags-list">
+                                        @foreach (var tag in item.Tags.SelectMany(t => t.Split(',')).Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)))
+                                        {
+                                            <span class="tag-item" title="@tag">@GetTagShortName(tag)</span>
+                                        }
+                                    </div>
                                 }
                                 <p><strong>Ratings:</strong> @(item.RatingCount == 0 ? "0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0")) (Total) across @item.RatingCount vote(s)</p>
                                 
@@ -139,11 +145,14 @@ else
     private int? _selectedMealId;
     
     private Dictionary<string, int> _userRatings = new();
+    private Dictionary<string, string> _tagMappings = new();
     private string? _sessionId;
     private const string RatingCookiePrefix = "wtd-ur-"; // user rating cookie prefix
 
     protected override async Task OnInitializedAsync()
     {
+        _tagMappings = Configuration.GetSection("TagMappings").Get<Dictionary<string, string>>() ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         _sessionId = HttpContextAccessor.HttpContext?.Request.Cookies["UserSessionId"];
         LoadUserRatingsFromCookies();
         
@@ -366,6 +375,37 @@ else
                 DeleteCookie(key);
             }
         }
+    }
+
+    private string FormatCampusName(string campusName)
+    {
+        if (string.IsNullOrEmpty(campusName))
+            return campusName;
+
+        if (campusName.Contains(" - "))
+        {
+            return campusName.Replace(" - ", ": ");
+        }
+
+        if (campusName.Contains("@"))
+        {
+            var colonIndex = campusName.IndexOf(':');
+            var atIndex = campusName.IndexOf('@');
+
+            if (colonIndex > -1 && atIndex > colonIndex)
+            {
+                var prefix = campusName.Substring(0, colonIndex);
+                var suffix = campusName.Substring(atIndex + 1).Trim();
+                return $"{prefix}: {suffix}";
+            }
+        }
+
+        return campusName;
+    }
+
+    private string GetTagShortName(string tag)
+    {
+        return _tagMappings.TryGetValue(tag, out var shortName) ? shortName : tag;
     }
 
     // May not run post server-side render, maybe run through js interop if it becomes a problem

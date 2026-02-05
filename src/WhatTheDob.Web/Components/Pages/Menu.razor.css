@@ -183,3 +183,29 @@
         grid-template-columns: 1fr;
     }
 }
+
+.tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin: 0.5rem 0;
+}
+
+.tag-item {
+    background-color: #ffffff;
+    border: 2px solid #000000;
+    border-radius: 20px;
+    padding: 0.2rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: bold;
+    box-shadow: 2px 2px #000000;
+}
+
+.menu-item.category-color-0 { background-color: #ffd1dc; } /* Pink */
+.menu-item.category-color-1 { background-color: #e2f0cb; } /* Green */
+.menu-item.category-color-2 { background-color: #bae1ff; } /* Blue */
+.menu-item.category-color-3 { background-color: #ffffba; } /* Yellow */
+.menu-item.category-color-4 { background-color: #ffb3ba; } /* Reddish */
+.menu-item.category-color-5 { background-color: #ffdfba; } /* Orange */
+.menu-item.category-color-6 { background-color: #e0bbe4; } /* Purple */
+.menu-item.category-color-7 { background-color: #ffffff; } /* White/Default */

@@ -81,7 +81,6 @@
 }
 
 .menu-item {
-    padding: 1rem;
     /*will need to be dynamic based on category*/
     background-color: #fff;
 }
@@ -94,25 +93,33 @@
 }
 
 .menu-item h4 {
-    margin-top: 0;
-    margin-bottom: 0.75rem;
+    margin: 0;
     color: #212529;
     font-size: 1.1rem;
 }
 
 .menu-item p {
-    margin: 0.5rem 0;
+    margin: 0.5rem 0.75rem;
     color: #6c757d;
     font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.menu-item-header {
+    border-top-width: 0;
+    border-left-width: 0;
+    border-right-width: 0;
+    border-bottom: 3px solid #000000;
+    padding: 0.75rem 1rem;
 }
 
 .star-rating {
     display: flex;
     align-items: center;
     gap: 0.25rem;
-    margin-top: 0.75rem;
+    margin: 0.5rem 0.75rem;
     flex-direction: row-reverse;
-    justify-content: flex-end;
+    justify-content: center;
 }
 
 .star-button {
@@ -188,7 +195,7 @@
     display: flex;
     flex-wrap: wrap;
     gap: 0.5rem;
-    margin: 0.5rem 0;
+    margin: 0.5rem 0.75rem;
 }
 
 .tag-item {

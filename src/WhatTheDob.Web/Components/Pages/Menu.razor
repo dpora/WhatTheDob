@@ -75,25 +75,19 @@ else
         }
         else
         {
+            var categoryIndex = 0;
             @foreach (var category in _menu.Items.GroupBy(item => item.Category).OrderBy(g => g.Key))
             {
+                var colorIndex = categoryIndex % 8;
                 <div class="menu-category">
                     <h3 class="category-header">@category.Key</h3>
                     <ul class="menu-item-list">
                         @foreach (var item in category)
                         {
                             <li class="menu-item card-style-lg">
-                                <h4>@item.Value</h4>
-                                @if (item.Tags?.Count > 0)
-                                {
-                                    <div class="tags-list">
-                                        @foreach (var tag in item.Tags.SelectMany(t => t.Split(',')).Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)))
-                                        {
-                                            <span class="tag-item" title="@tag">@GetTagShortName(tag)</span>
-                                        }
-                                    </div>
-                                }
-                                <p><strong>Ratings:</strong> @(item.RatingCount == 0 ? "0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0")) (Total) across @item.RatingCount vote(s)</p>
+                                <div class="menu-item-header category-color-@colorIndex">
+                                    <h4>@item.Value</h4>
+                                </div>
                                 
                                 <div class="star-rating">
                                     @{
@@ -107,8 +101,8 @@ else
                                         var fillPercent = GetFillPercent(displayRating, starIndex);
                                         var isPartial = fillPercent > 0 && fillPercent < 100;
                                         var isFilled = fillPercent == 100;
-                                        
-                                        <button type="button" 
+
+                                        <button type="button"
                                                 class="star-button @(isUserRated && isFilled ? "user" : "") @(isFilled ? "filled" : "") @(isPartial ? "partial" : "")"
                                                 style="@(isPartial ? $"--fill-percent: {fillPercent}%" : "")"
                                                 @onclick="() => SubmitRating(item.Value, starIndex)"
@@ -116,15 +110,22 @@ else
                                             ★
                                         </button>
                                     }
-                                    @if (isUserRated)
-                                    {
-                                        <span class="user-rating-text">Your rating: @userRating</span>
-                                    }
                                 </div>
+                                <p>@(item.RatingCount == 0 ? "0.0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0"))/5 (@item.RatingCount rating@(item.RatingCount == 0 ? "" : "s"))</p>
+                                @if (item.Tags?.Count > 0)
+                                {
+                                    <div class="tags-list">
+                                        @foreach (var tag in item.Tags.SelectMany(t => t.Split(',')).Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t)))
+                                        {
+                                            <span class="tag-item" title="@tag">@GetTagShortName(tag)</span>
+                                        }
+                                    </div>
+                                }
                             </li>
                         }
                     </ul>
                 </div>
+                categoryIndex++;
             }
         }
     </section>

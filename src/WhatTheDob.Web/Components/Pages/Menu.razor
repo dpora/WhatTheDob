@@ -85,7 +85,7 @@ else
                         @foreach (var item in category)
                         {
                             <li class="menu-item card-style-lg">
-                                <div class="menu-item-header category-color-@colorIndex">
+                                <div class="menu-item-header iterable-color-@colorIndex">
                                     <h4>@item.Value</h4>
                                 </div>
                                 
@@ -107,11 +107,13 @@ else
                                                 style="@(isPartial ? $"--fill-percent: {fillPercent}%" : "")"
                                                 @onclick="() => SubmitRating(item.Value, starIndex)"
                                                 disabled="@_isSubmittingRating">
-                                            ★
                                         </button>
                                     }
                                 </div>
-                                <p>@(item.RatingCount == 0 ? "0.0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0"))/5 (@item.RatingCount rating@(item.RatingCount == 0 ? "" : "s"))</p>
+                                <div class="rating-info">
+                                    <div class="line"></div>
+                                    <p>@(item.RatingCount == 0 ? "0.0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0"))/5 (@item.RatingCount rating@(item.RatingCount == 0 ? "" : "s"))</p>
+                                </div>
                                 @if (item.Tags?.Count > 0)
                                 {
                                     <div class="tags-list">

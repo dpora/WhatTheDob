@@ -48,6 +48,10 @@ node_modules/
 *.mdf
 *.ldf
 
+# Logs
+logstorage/
+*.log
+
 # Others
 blend/cache*/
 extra/blend/cache*/

@@ -1,8 +1,9 @@
 @page "/"
-@rendermode InteractiveServer
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inject IMenuService MenuService
 @inject IHttpContextAccessor HttpContextAccessor
 @inject IJSRuntime JS
+@inject ILogger<Menu> Logger
 @using MenuModel = WhatTheDob.Domain.Entities.Menu
 
 <PageTitle>Menu</PageTitle>
@@ -148,10 +149,13 @@ else
     protected override async Task OnInitializedAsync()
     {
         _sessionId = HttpContextAccessor.HttpContext?.Request.Cookies["UserSessionId"];
+        Logger.LogInformation("Menu page initialized with SessionId={SessionId}", _sessionId ?? "null");
+        
         LoadUserRatingsFromCookies();
         
         try
         {
+            Logger.LogDebug("Loading campuses and meals filters");
             var campusesTask = MenuService.GetCampusesAsync();
             var mealsTask = MenuService.GetMealsAsync();
             
@@ -169,10 +173,14 @@ else
             {
                 _selectedMealId = _meals.First().Id;
             }
+            
+            Logger.LogInformation("Filters loaded successfully: {CampusCount} campuses, {MealCount} meals", 
+                _campuses.Count, _meals.Count);
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Failed to load filters: {ex.Message}";
+            Logger.LogError(ex, "Failed to load filters in Menu page initialization");
+            _errorMessage = "Failed to load filters. Please refresh the page.";
         }
         finally
         {
@@ -185,6 +193,8 @@ else
         if (!_selectedCampusId.HasValue || !_selectedMealId.HasValue)
         {
             _errorMessage = "Please select both a campus and a meal.";
+            Logger.LogWarning("Menu load attempted without valid selections: CampusId={CampusId}, MealId={MealId}", 
+                _selectedCampusId, _selectedMealId);
             StateHasChanged();
             return;
         }
@@ -196,17 +206,28 @@ else
         try
         {
             var formattedDate = _selectedDate.ToString("MM/dd/yy");
+            Logger.LogInformation("Loading menu for Date={Date}, CampusId={CampusId}, MealId={MealId}, SessionId={SessionId}", 
+                formattedDate, _selectedCampusId.Value, _selectedMealId.Value, _sessionId ?? "null");
             
             _menu = await MenuService.GetMenuAsync(formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
             
             if (_menu is null)
             {
                 _errorMessage = "No menu found for the selected date, campus, and meal.";
+                Logger.LogInformation("No menu found for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
+                    formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
+            }
+            else
+            {
+                Logger.LogInformation("Menu loaded successfully with {ItemCount} items for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
+                    _menu.Items.Count, formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
             }
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Failed to load menu: {ex.Message}";
+            Logger.LogError(ex, "Failed to load menu for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
+                _selectedDate.ToString("MM/dd/yy"), _selectedCampusId.Value, _selectedMealId.Value);
+            _errorMessage = "Failed to load menu. Please try again.";
         }
         finally
         {
@@ -220,6 +241,7 @@ else
         if (string.IsNullOrEmpty(_sessionId))
         {
             _errorMessage = "Session ID not found. Please refresh the page.";
+            Logger.LogWarning("Rating submission attempted without session ID for ItemValue={ItemValue}", itemValue);
             StateHasChanged();
             return;
         }
@@ -229,6 +251,9 @@ else
         
         try
         {
+            Logger.LogInformation("Submitting rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                _sessionId, itemValue, rating);
+                
             await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
             
             _userRatings[itemValue] = rating;
@@ -240,10 +265,15 @@ else
                 var formattedDate = _selectedDate.ToString("MM/dd/yy");
                 _menu = await MenuService.GetMenuAsync(formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
             }
+            
+            Logger.LogInformation("Rating submitted successfully: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                _sessionId, itemValue, rating);
         }
         catch (Exception ex)
         {
-            _errorMessage = $"Failed to submit rating: {ex.Message}";
+            Logger.LogError(ex, "Failed to submit rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                _sessionId ?? "null", itemValue, rating);
+            _errorMessage = "Failed to submit rating. Please try again.";
         }
         finally
         {

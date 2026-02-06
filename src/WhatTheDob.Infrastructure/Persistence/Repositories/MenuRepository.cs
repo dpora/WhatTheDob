@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using Microsoft.Extensions.Logging;
 using WhatTheDob.Infrastructure.Interfaces.Persistence;
 
 using DomainMenu = WhatTheDob.Domain.Entities.Menu;
@@ -28,18 +29,23 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
     public class MenuRepository : IMenuRepository
     {
         private readonly PersistenceContext _dbContext;
+        private readonly ILogger<MenuRepository> _logger;
 
-        public MenuRepository(PersistenceContext dbContext)
+        public MenuRepository(PersistenceContext dbContext, ILogger<MenuRepository> logger)
         {
             _dbContext = dbContext;
+            _logger = logger;
         }
 
         public async Task UpsertCampusesAsync(IDictionary<int, string> campuses, CancellationToken cancellationToken = default)
         {
             if (campuses == null || campuses.Count < 1)
             {
+                _logger.LogDebug("No campuses to upsert");
                 return;
             }
+
+            _logger.LogInformation("Upserting {CampusCount} campuses", campuses.Count);
 
             foreach (var campus in campuses)
             {
@@ -58,15 +64,18 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     };
 
                     _dbContext.Campuses.Add(campusEntity);
+                    _logger.LogDebug("Added new campus: Id={CampusId}, Value={CampusValue}", campus.Key, campus.Value);
                 }
                 else
                 {
                     campusEntity.Value = campus.Value;
                     campusEntity.Disabled = 0;
+                    _logger.LogDebug("Updated existing campus: Id={CampusId}, Value={CampusValue}", campus.Key, campus.Value);
                 }
             }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            _logger.LogInformation("Successfully upserted {CampusCount} campuses", campuses.Count);
         }
 
         public async Task<IEnumerable<PersistenceCampus>> GetCampusesAsync(CancellationToken cancellationToken = default)
@@ -133,12 +142,20 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
         {
             var menuList = menus.ToList();
 
-            if (menuList.Count == 0) return;
+            if (menuList.Count == 0)
+            {
+                _logger.LogDebug("No menus to upsert");
+                return;
+            }
 
+            _logger.LogInformation("Starting upsert of {MenuCount} menus", menuList.Count);
+            
             var strategy = _dbContext.Database.CreateExecutionStrategy();
             await strategy.ExecuteAsync(async () =>
             {
                 await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                _logger.LogDebug("Database transaction started for menu upsert");
+                
                 try
                 {
                     var mealNames = menuList
@@ -319,10 +336,12 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
                     await transaction.CommitAsync(cancellationToken);
+                    _logger.LogInformation("Successfully committed transaction for {MenuCount} menus", menuList.Count);
                 }
-                catch
+                catch (Exception ex)
                 {
                     await transaction.RollbackAsync(cancellationToken);
+                    _logger.LogError(ex, "Transaction rolled back during menu upsert for {MenuCount} menus", menuList.Count);
                     throw;
                 }
             });
@@ -377,6 +396,9 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
         public async Task UpsertUserRatingAsync(string sessionId, string itemValue, int rating,
             CancellationToken cancellationToken = default)
         {
+            _logger.LogInformation("Upserting user rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                sessionId, itemValue, rating);
+                
             var itemRating = await _dbContext.ItemRatings
                 .AsTracking()
                 .FirstOrDefaultAsync(r => r.Value == itemValue.Trim(), cancellationToken)
@@ -386,6 +408,8 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
             // Most likely will not happen as we are creating item ratings when creating menu items
             if (itemRating == null)
             {
+                _logger.LogDebug("Item rating not found for ItemValue={ItemValue}, checking if menu item exists", itemValue);
+                
                 var menuItem = await _dbContext.MenuItems
                     .AsNoTracking()
                     .FirstOrDefaultAsync(r => r.Value == itemValue.Trim(), cancellationToken)
@@ -393,6 +417,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
 
                 if (menuItem == null)
                 {
+                    _logger.LogWarning("No menu items exist for ItemValue={ItemValue}", itemValue);
                     throw new ArgumentException("No menu items exist for specified item value");
                 }
 
@@ -410,6 +435,7 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
 
                 itemRating = itemRatingEntity;
+                _logger.LogInformation("Created new item rating for ItemValue={ItemValue}", itemValue);
             }
 
             var userRating = await _dbContext.UserRatings
@@ -432,13 +458,20 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                 
                 itemRating.TotalRating += rating;
                 itemRating.RatingCount += 1;
+                
+                _logger.LogInformation("Created new user rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                    sessionId, itemValue, rating);
             }
             else // Update existing user rating and ItemRating aggregate
             {
+                var oldRating = userRating.RatingValue;
                 itemRating.TotalRating += (rating - userRating.RatingValue);
 
                 userRating.RatingValue = rating;
                 userRating.UpdatedAt = DateTime.UtcNow.ToString("o");
+                
+                _logger.LogInformation("Updated user rating: SessionId={SessionId}, ItemValue={ItemValue}, OldRating={OldRating}, NewRating={NewRating}", 
+                    sessionId, itemValue, oldRating, rating);
             }
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
         }

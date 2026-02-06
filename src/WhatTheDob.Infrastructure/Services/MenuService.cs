@@ -281,26 +281,26 @@ namespace WhatTheDob.Infrastructure.Services
         {
             _logger.LogDebug("Retrieving campuses from repository");
             var campuses = await _menuRepository.GetCampusesAsync().ConfigureAwait(false);
-            var campusList = campuses.Select(c => new Campus
+            var campusesList = campuses.ToList();
+            _logger.LogInformation("Retrieved {CampusCount} campuses", campusesList.Count);
+            return campusesList.Select(c => new Campus
             {
                 Id = c.Id,
                 Value = c.Value
-            }).ToList();
-            _logger.LogInformation("Retrieved {CampusCount} campuses", campusList.Count);
-            return campusList;
+            });
         }
 
         public async Task<IEnumerable<Meal>> GetMealsAsync()
         {
             _logger.LogDebug("Retrieving meals from repository");
             var meals = await _menuRepository.GetMealsAsync().ConfigureAwait(false);
-            var mealsList = meals.Select(m => new Meal
+            var mealsList = meals.ToList();
+            _logger.LogInformation("Retrieved {MealCount} meals", mealsList.Count);
+            return mealsList.Select(m => new Meal
             {
                 Id = m.Id,
                 Value = m.Value
-            }).ToList();
-            _logger.LogInformation("Retrieved {MealCount} meals", mealsList.Count);
-            return mealsList;
+            });
         }
 
         public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)

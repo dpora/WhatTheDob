@@ -13,8 +13,30 @@ using WhatTheDob.Infrastructure.Services;
 using WhatTheDob.Infrastructure.Services.BackgroundTasks;
 using WhatTheDob.Infrastructure.Services.External;
 using WhatTheDob.Web.Components;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+var repoRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."));
+var logStorageFolder = builder.Configuration.GetValue<string>("Serilog:LogDirectory") ?? "logstorage";
+var fullLogStoragePath = Path.Combine(repoRoot, logStorageFolder);
+Directory.CreateDirectory(fullLogStoragePath);
+
+var logFilePath = Path.Combine(fullLogStoragePath, "whatthedobweb-.log");
+
+// Configure Serilog
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.File(
+        path: logFilePath,
+        rollingInterval: RollingInterval.Day,
+        retainedFileCountLimit: 7,
+        outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
+    .CreateLogger();
+
+builder.Host.UseSerilog();
+
+Log.Information("Starting WhatTheDob Web application");
 
 // Add services to the container.
 builder.Services.AddRazorComponents()
@@ -23,9 +45,10 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpContextAccessor();
 
 // Get data storage path from configuration
-var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:Path") ?? "datastorage";
-var repoRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."));
+var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:DataDirectory") ?? "datastorage";
 var fullDataStoragePath = Path.Combine(repoRoot, dataStoragePath);
+
+Log.Information("Data storage path configured: {FullDataStoragePath}", fullDataStoragePath);
 
 // Update connection string to use the data storage path
 var connectionString = builder.Configuration.GetConnectionString("WhatTheDob");
@@ -45,6 +68,8 @@ if (!string.IsNullOrWhiteSpace(connectionString))
 
 builder.Services.AddDbContext<WhatTheDobDbContext>(options =>
     options.UseSqlite(connectionString));
+
+Log.Information("Database context configured with SQLite");
 
 builder.Services.AddScoped<IMenuService, MenuService>();
 builder.Services.AddScoped<IMenuRepository, MenuRepository>();
@@ -83,14 +108,24 @@ if (!string.IsNullOrWhiteSpace(dbConnection))
 
 // Ensure the database is created
 await db.Database.EnsureCreatedAsync();
+Log.Information("Database created/verified successfully");
 
 // Check if initial fetch is required
 var initialFetch = builder.Configuration.GetValue<bool?>("MenuFetch:InitialFetch") ?? false;
 if (initialFetch)
 {
-    // Grab all menus from API on startup and insert into DB
-    var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
-    await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
+    try
+    {
+        Log.Information("Initial menu fetch is enabled, starting fetch...");
+        // Grab all menus from API on startup and insert into DB
+        var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
+        await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
+        Log.Information("Initial menu fetch completed successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Initial menu fetch failed");
+    }
 }
 
 // Schedule daily menu fetch task.
@@ -101,6 +136,7 @@ var dailyFetchDaysOffset = builder.Configuration.GetValue<int?>("MenuFetch:DaysT
 var job = scope.ServiceProvider.GetRequiredService<IDailyMenuJob>();
 // Each day at midnight, fetch the menu for the date 'dailyFetchDaysOffset + today'
 job.ScheduleDailyTask(dailyFetchDaysOffset);
+Log.Information("Daily menu fetch job scheduled with {DaysOffset} days offset", dailyFetchDaysOffset);
 
 // Use custom middleware to manage session cookies, i.e. session identifiers for users
 app.UseMiddleware<WhatTheDob.Web.Middleware.SessionCookieMiddleware>();
@@ -113,4 +149,19 @@ app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
-app.Run();
+Log.Information("WhatTheDob Web application configured and ready to run");
+
+try
+{
+    app.Run();
+    Log.Information("WhatTheDob Web application shut down gracefully");
+}
+catch (Exception ex)
+{
+    Log.Fatal(ex, "WhatTheDob Web application terminated unexpectedly");
+    throw;
+}
+finally
+{
+    Log.CloseAndFlush();
+}

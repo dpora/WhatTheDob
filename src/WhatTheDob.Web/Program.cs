@@ -16,14 +16,19 @@ using WhatTheDob.Web.Components;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+var repoRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."));
+var logStorageFolder = builder.Configuration.GetValue<string>("Serilog:LogDirectory") ?? "logstorage";
+var fullLogStoragePath = Path.Combine(repoRoot, logStorageFolder);
+Directory.CreateDirectory(fullLogStoragePath);
+
+var logFilePath = Path.Combine(fullLogStoragePath, "whatthedobweb-.log");
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
-    .WriteTo.Console()
     .WriteTo.File(
-        path: "logs/whatthedobweb-.log",
+        path: logFilePath,
         rollingInterval: RollingInterval.Day,
         retainedFileCountLimit: 7,
         outputTemplate: "{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz} [{Level:u3}] {Message:lj}{NewLine}{Exception}")
@@ -40,8 +45,7 @@ builder.Services.AddRazorComponents()
 builder.Services.AddHttpContextAccessor();
 
 // Get data storage path from configuration
-var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:Path") ?? "datastorage";
-var repoRoot = Path.GetFullPath(Path.Combine(builder.Environment.ContentRootPath, "..", ".."));
+var dataStoragePath = builder.Configuration.GetValue<string>("DataStorage:DataDirectory") ?? "datastorage";
 var fullDataStoragePath = Path.Combine(repoRoot, dataStoragePath);
 
 Log.Information("Data storage path configured: {FullDataStoragePath}", fullDataStoragePath);
@@ -110,11 +114,18 @@ Log.Information("Database created/verified successfully");
 var initialFetch = builder.Configuration.GetValue<bool?>("MenuFetch:InitialFetch") ?? false;
 if (initialFetch)
 {
-    Log.Information("Initial menu fetch is enabled, fetching menus from API...");
-    // Grab all menus from API on startup and insert into DB
-    var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
-    await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
-    Log.Information("Initial menu fetch completed successfully");
+    try
+    {
+        Log.Information("Initial menu fetch is enabled, starting fetch...");
+        // Grab all menus from API on startup and insert into DB
+        var menuService = scope.ServiceProvider.GetRequiredService<IMenuService>();
+        await menuService.FetchMenusFromApiAsync().ConfigureAwait(false);
+        Log.Information("Initial menu fetch completed successfully");
+    }
+    catch (Exception ex)
+    {
+        Log.Error(ex, "Initial menu fetch failed");
+    }
 }
 
 // Schedule daily menu fetch task.

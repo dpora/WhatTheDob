@@ -1,5 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,13 +28,15 @@ namespace WhatTheDob.Infrastructure.Services
         private readonly IMenuItemMapper _menuParser;
         private readonly IMenuFilterMapper _menuFilterMapper;
         private readonly int _campusId;
+        private readonly ILogger<MenuService> _logger;
 
         public MenuService(
             IConfiguration configuration,
             IMenuApiClient menuApiClient,
             IMenuRepository menuRepository,
             IMenuItemMapper menuParser,
-            IMenuFilterMapper menuFilterMapper)
+            IMenuFilterMapper menuFilterMapper,
+            ILogger<MenuService> logger)
         {
             var fetchSettings = configuration.GetSection("MenuFetch");
 
@@ -46,11 +49,16 @@ namespace WhatTheDob.Infrastructure.Services
             _menuRepository = menuRepository;
             _menuParser = menuParser;
             _menuFilterMapper = menuFilterMapper;
+            _logger = logger;
+            
+            _logger.LogInformation("MenuService initialized with DaysToFetch={DaysToFetch}, SelectedCampus={CampusId}, MenuApiUrl={MenuApiUrl}", 
+                _daysToFetch, _campusId, _menuApiUrl);
         }
         // FetchMenusFromApiAsync fetches menu data from an external API, processes it, and stores it in the repository.
         // It retrieves campus and meal options, iterates over the specified days (_daysToFetch). 
         public async Task<List<Menu>> FetchMenusFromApiAsync()
         {
+            _logger.LogInformation("Starting menu fetch from API for {DaysToFetch} days", _daysToFetch);
 
             var filterHtml = await _menuApiClient.GetMenuDataAsync(_menuApiUrl).ConfigureAwait(false);
 
@@ -68,6 +76,9 @@ namespace WhatTheDob.Infrastructure.Services
 
             await _menuRepository.UpsertCampusesAsync(campusMap).ConfigureAwait(false);
             await _menuRepository.UpsertMealsAsync(mealOptions).ConfigureAwait(false);
+            
+            _logger.LogInformation("Parsed {CampusCount} campuses and {MealCount} meals from filter data", 
+                campusMap.Count, mealOptions.Count());
 
             var campusIdsToProcess = campusMap.Keys.ToList();
 
@@ -106,7 +117,8 @@ namespace WhatTheDob.Infrastructure.Services
                         var capturedCampusId = campusId;
                         var capturedMeal = meal;
 
-                        Console.WriteLine($"Adding Task: GetMenuDataAsync({_menuApiUrl}, {capturedDate}, {capturedMeal}, {capturedCampusId})");
+                        _logger.LogDebug("Creating task: GetMenuDataAsync({MenuApiUrl}, {Date}, {Meal}, {CampusId})", 
+                            _menuApiUrl, capturedDate, capturedMeal, capturedCampusId);
 
                         menuTasks.Add(Task.Run(async () =>
                         {
@@ -124,7 +136,8 @@ namespace WhatTheDob.Infrastructure.Services
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine($"Error fetching menu for Date={capturedDate}, Meal={capturedMeal}, Campus={capturedCampusId}: {ex.Message}");
+                                _logger.LogError(ex, "Error fetching menu for Date={Date}, Meal={Meal}, Campus={CampusId}", 
+                                    capturedDate, capturedMeal, capturedCampusId);
                                 return null;
                             }
                         }));
@@ -133,15 +146,19 @@ namespace WhatTheDob.Infrastructure.Services
             }
 
             // Await all tasks concurrently
-            Console.WriteLine($"Awaiting {menuTasks.Count} menu tasks...");
+            _logger.LogInformation("Awaiting {TaskCount} menu fetch tasks", menuTasks.Count);
             var results = await Task.WhenAll(menuTasks).ConfigureAwait(false);
 
             // Filter out nulls (failed requests or empty html)
             var menus = results.OfType<Menu>().ToList();
+            
+            _logger.LogInformation("Successfully fetched {MenuCount} menus out of {TaskCount} attempts", 
+                menus.Count, menuTasks.Count);
 
             if (menus.Count > 0)
             {
                 await _menuRepository.UpsertMenusAsync(menus).ConfigureAwait(false);
+                _logger.LogInformation("Menus successfully upserted to repository");
             }
 
             return menus;
@@ -228,11 +245,17 @@ namespace WhatTheDob.Infrastructure.Services
         // GetMenuAsync retrieves a menu for a specific date, campus, and meal from the repository and maps it to the domain entity.
         public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
         {
+            _logger.LogInformation("Retrieving menu for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
+                date, campusId, mealId);
+                
             var menuMappings = await _menuRepository.GetMenuMappingsAsync(date, campusId, mealId).ConfigureAwait(false);
             if (menuMappings == null || !menuMappings.Any())
             {
+                _logger.LogWarning("No menu found for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
+                    date, campusId, mealId);
                 return null;
             }
+            
             var domainMenu = new Menu
             {
                 Date = date,
@@ -247,51 +270,69 @@ namespace WhatTheDob.Infrastructure.Services
                     RatingCount = mm.MenuItem.ItemRating.RatingCount
                 })]
             };
+            
+            _logger.LogInformation("Successfully retrieved menu with {ItemCount} items for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
+                domainMenu.Items.Count, date, campusId, mealId);
+            
             return domainMenu;
         }
 
         public async Task<IEnumerable<Campus>> GetCampusesAsync()
         {
+            _logger.LogDebug("Retrieving campuses from repository");
             var campuses = await _menuRepository.GetCampusesAsync().ConfigureAwait(false);
-            return campuses.Select(c => new Campus
+            var campusList = campuses.Select(c => new Campus
             {
                 Id = c.Id,
                 Value = c.Value
-            });
+            }).ToList();
+            _logger.LogInformation("Retrieved {CampusCount} campuses", campusList.Count);
+            return campusList;
         }
 
         public async Task<IEnumerable<Meal>> GetMealsAsync()
         {
+            _logger.LogDebug("Retrieving meals from repository");
             var meals = await _menuRepository.GetMealsAsync().ConfigureAwait(false);
-            return meals.Select(m => new Meal
+            var mealsList = meals.Select(m => new Meal
             {
                 Id = m.Id,
                 Value = m.Value
-            });
+            }).ToList();
+            _logger.LogInformation("Retrieved {MealCount} meals", mealsList.Count);
+            return mealsList;
         }
 
         public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
         {
+            _logger.LogInformation("Submitting user rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                sessionId, itemValue, rating);
+                
             // Normalize values to avoid accidental duplicates due to whitespace/casing
             var trimmedSessionId = sessionId?.Trim();
             var trimmedItemValue = itemValue?.Trim();
 
             if (string.IsNullOrWhiteSpace(trimmedSessionId))
             {
+                _logger.LogWarning("Rating submission failed: Session ID is empty");
                 throw new ArgumentException("Session id is required.", nameof(trimmedSessionId));
             }
 
             if (string.IsNullOrWhiteSpace(trimmedItemValue))
             {
+                _logger.LogWarning("Rating submission failed: Item value is empty");
                 throw new ArgumentException("Item value is required.", nameof(trimmedItemValue));
             }
 
             if (rating < 1 || rating > 5)
             {
+                _logger.LogWarning("Rating submission failed: Rating {Rating} is out of range (1-5)", rating);
                 throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
             }
 
             await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
+            _logger.LogInformation("User rating successfully submitted: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                trimmedSessionId, trimmedItemValue, rating);
         }
     }
 }

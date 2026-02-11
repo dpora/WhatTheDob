@@ -1,6 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300..700&display=swap');
 
 :root {
+    --iterable-color-0: #FF8833;
+    --iterable-color-1: #3CDD8C;
+    --iterable-color-2: #FFCC33;
+    --iterable-color-3: #F391D7;
+    --iterable-color-4: #19B4B9;
+    --iterable-color-5: #3DB8F5;
+    --iterable-color-6: #EF5D8D;
+    --iterable-color-7: #BB67E4;
     --color-primary: #1b6ec2;
     --color-primary-border: #1861ac;
     --color-link: #006bb7;

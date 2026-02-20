@@ -102,7 +102,9 @@ else
                                                 class="star-button @(isUserRated && isFilled ? "user" : "") @(isFilled ? "filled" : "") @(isPartial ? "partial" : "")"
                                                 style="@(isPartial ? $"--fill-percent: {fillPercent}%" : "")"
                                                 @onclick="() => SubmitRating(item.Value, starIndex)"
-                                                disabled="@_isSubmittingRating">
+                                                disabled="@_isSubmittingRating"
+                                                aria-label="Rate @starIndex out of 5"
+                                                title="Rate @starIndex out of 5">
                                         </button>
                                     }
                                 </div>

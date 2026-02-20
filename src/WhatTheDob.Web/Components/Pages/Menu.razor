@@ -108,7 +108,7 @@ else
                                 </div>
                                 <div class="rating-info">
                                     <div class="line"></div>
-                                    <p>@(item.RatingCount == 0 ? "0.0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0"))/5 (@item.RatingCount rating@(item.RatingCount == 0 ? "" : "s"))</p>
+                                    <p>@(item.RatingCount == 0 ? "0.0" : ((double)item.TotalRating / item.RatingCount).ToString("0.0"))/5 (@item.RatingCount rating@(item.RatingCount == 1 ? "" : "s"))</p>
                                 </div>
                                 @if (item.Tags?.Count > 0)
                                 {

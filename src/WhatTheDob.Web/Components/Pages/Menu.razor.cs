@@ -175,7 +175,7 @@ namespace WhatTheDob.Web.Components.Pages
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to submit rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}",
-                    _sessionId ?? "null", itemValue, rating);
+                    _sessionId, itemValue, rating);
                 _errorMessage = "Failed to submit rating. Please try again.";
             }
             finally

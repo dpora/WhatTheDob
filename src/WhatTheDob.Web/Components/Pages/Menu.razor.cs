@@ -54,7 +54,7 @@ namespace WhatTheDob.Web.Components.Pages
             _sessionId = HttpContextAccessor.HttpContext?.Request.Cookies["UserSessionId"];
             Logger.LogInformation("Menu page initialized with SessionId={SessionId}", _sessionId ?? "null");
 
-            LoadUserRatingsFromCookies();
+            await LoadUserRatingsFromCookiesAsync();
 
             try
             {
@@ -160,8 +160,8 @@ namespace WhatTheDob.Web.Components.Pages
                 await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
 
                 _userRatings[itemValue] = rating;
-                SaveUserRatingToCookies(itemValue, rating);
-                CleanupMismatchedRatingCookies();
+                await SaveUserRatingToCookiesAsync(itemValue, rating);
+                await CleanupMismatchedRatingCookiesAsync();
 
                 if (_menu != null && _selectedCampusId.HasValue && _selectedMealId.HasValue)
                 {

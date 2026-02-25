@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using Microsoft.JSInterop;
 
@@ -10,7 +11,7 @@ namespace WhatTheDob.Web.Components.Pages
     {
         private const string RatingCookiePrefix = "wtd-ur-"; // user rating cookie prefix
 
-        private void LoadUserRatingsFromCookies()
+        private async Task LoadUserRatingsFromCookiesAsync()
         {
             var context = HttpContextAccessor.HttpContext;
             if (context == null) return;
@@ -56,7 +57,7 @@ namespace WhatTheDob.Web.Components.Pages
             }
         }
 
-        private void SaveUserRatingToCookies(string itemValue, int rating)
+        private async Task SaveUserRatingToCookiesAsync(string itemValue, int rating)
         {
             var context = HttpContextAccessor.HttpContext;
             if (string.IsNullOrEmpty(_sessionId)) return;
@@ -66,12 +67,10 @@ namespace WhatTheDob.Web.Components.Pages
             var value = _sessionId + ":" + rating;
 
             var isHttps = context?.Request?.IsHttps == true;
-            var secureFlag = isHttps ? "Secure; " : string.Empty;
-            var cookieString = $"{key}={value}; {secureFlag}SameSite=Lax; Path=/; Max-Age={(int)TimeSpan.FromDays(7).TotalSeconds}";
-            JS.InvokeVoidAsync("eval", $"document.cookie = '{cookieString.Replace("'", "\\'")}'");
+            await JS.InvokeVoidAsync("CookieStorageAccessor.setCookie", key, value, (int)TimeSpan.FromDays(7).TotalDays, isHttps);
         }
 
-        private void CleanupMismatchedRatingCookies()
+        private async Task CleanupMismatchedRatingCookiesAsync()
         {
             var context = HttpContextAccessor.HttpContext;
             if (context == null) return;

@@ -2,11 +2,17 @@
 
 Blazor Server web app for browsing the Penn State Behrend Dobbins dining hall menu and rating dishes. Data is scraped from the public PSU menu page, stored in SQLite via EF Core, and exposed through a single-page experience with anonymous session-based ratings.
 
+## Why this exists
+The dining hall at my college is notorious for hit-or-miss (mostly miss) food. I built this so students can rate each item 1–5 and help each other decide what to grab or avoid. It started as a Dobbins-only rater and grew to support multiple campuses and dining halls.
+
 ## Architecture at a Glance
 - Web UI: Blazor Server app in [src/WhatTheDob.Web](src/WhatTheDob.Web). Handles routing, UI, dependency injection, logging, and the background fetch timer.
 - Application: Contracts in [src/WhatTheDob.Application](src/WhatTheDob.Application) defining services and background jobs used by the UI.
 - Domain: Menu entities in [src/WhatTheDob.Domain](src/WhatTheDob.Domain) (campus, meal, menu, menu item).
 - Infrastructure: EF Core + HtmlAgilityPack implementations in [src/WhatTheDob.Infrastructure](src/WhatTheDob.Infrastructure) for scraping, mapping, persistence, and ratings.
+
+### Documentation assets
+- ERD, package-style overview, and source diagram: see [documentation](documentation) (includes exported images plus the editable drawio file).
 
 ### Data flow
 1. Menu fetch: `MenuService` calls the PSU menu page through `MenuApiClient`, parses HTML with `MenuFilterMapper`/`MenuItemMapper`, then upserts campuses, meals, menus, and items via `MenuRepository` into SQLite.

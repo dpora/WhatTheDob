@@ -62,6 +62,20 @@ public class MenuRepositoryTests
         context.UserRatings.Single().RatingValue.Should().Be(3);
     }
 
+    /// <summary>
+    /// Throws an exception because the item rating must exist before a user rating can be created. This enforces that ratings can only be submitted for items that are on the menu.
+    /// </summary>
+    /// <returns></returns>
+    [Fact]
+    public async Task UpsertUserRatingAsync_creates_user_rating_for_nonexisting_item()
+    {
+        using var harness = new SqliteInMemoryContext();
+        var context = harness.Context;
+        var repo = new MenuRepository(context, NullLogger<MenuRepository>.Instance);
+
+        await Assert.ThrowsAsync<ArgumentException>(async () => await repo.UpsertUserRatingAsync("session-1", "Pasta", 5));
+    }
+
     [Fact]
     public async Task UpsertMenusAsync_persists_menu_and_item_mappings()
     {

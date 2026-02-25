@@ -1,9 +1,9 @@
 # WhatTheDob
 
-Blazor Server web app for browsing the Penn State Behrend Dobbins dining hall menu and rating dishes. Data is scraped from the public PSU menu page, stored in SQLite via EF Core, and exposed through a single-page experience with anonymous session-based ratings.
+Blazor Server web app for browsing Penn State dining hall menus and rating their dishes. Data is scraped from the public PSU menu page, stored in SQLite via EF Core, and exposed through a single-page experience with anonymous session-based ratings.
 
 ## Why this exists
-The dining hall at my college is notorious for hit-or-miss (mostly miss) food. I built this so students can rate each item 1–5 and help each other decide what to grab or avoid. It started as a Dobbins-only rater and grew to support multiple campuses and dining halls.
+The dining hall at my college (Dobbins) is notorious for hit-or-miss (mostly miss) food. I built this so students can rate each item 1–5 and help each other decide what to grab or avoid. It started as a Dobbins-only rater and grew to support multiple campuses and dining halls.
 
 ## Architecture at a Glance
 - Web UI: Blazor Server app in [src/WhatTheDob.Web](src/WhatTheDob.Web). Handles routing, UI, dependency injection, logging, and the background fetch timer.

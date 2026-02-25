@@ -168,8 +168,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                         .Where(m => mealNames.Contains(m.Value))
                         .ToDictionaryAsync(m => m.Value, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
-
-                    // Bulk upsert categories
                     var categoryNames = menuList
                         .SelectMany(m => m.Items)
                         .Select(i => i.Category?.Trim() ?? "Uncategorized")
@@ -188,8 +186,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
-
-                    // Bulk upsert item ratings
                     var menuItemNames = menuList
                         .SelectMany(m => m.Items)
                         .Select(i => i.Value?.Trim())
@@ -216,8 +212,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
-
-                    // Bulk upsert menu items now
                     var existingMenuItems = new List<PersistenceMenuItem>();
                     foreach (var chunk in menuItemNames.Chunk(2000))
                     {
@@ -278,7 +272,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     }
                     await _dbContext.SaveChangesAsync(cancellationToken);
 
-                    // Bulk upsert Menus
                     var dates = menuList.Select(m => m.Date).Distinct().ToList();
                     var campusIds = menuList.Select(m => m.CampusId).Distinct().ToList();
 
@@ -474,84 +467,6 @@ namespace WhatTheDob.Infrastructure.Persistence.Repositories
                     sessionId, itemValue, oldRating, rating);
             }
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        private async Task<PersistenceMeal> GetOrCreateMealAsync(string mealName, CancellationToken cancellationToken)
-        {
-            var normalized = mealName.Trim();
-
-            var meal = await _dbContext.Meals
-                .AsTracking()
-                .FirstOrDefaultAsync(m => m.Value == normalized, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (meal != null)
-            {
-                return meal;
-            }
-
-            meal = new PersistenceMeal
-            {
-                Value = normalized,
-                Disabled = 0
-            };
-
-            _dbContext.Meals.Add(meal);
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            return meal;
-        }
-
-        private async Task<PersistenceCategory> GetOrCreateCategoryAsync(string categoryName, CancellationToken cancellationToken)
-        {
-            var normalized = string.IsNullOrWhiteSpace(categoryName) ? "Uncategorized" : categoryName.Trim();
-
-            var category = await _dbContext.Categories
-                .AsTracking()
-                .FirstOrDefaultAsync(c => c.Value == normalized, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (category != null)
-            {
-                return category;
-            }
-
-            category = new PersistenceCategory
-            {
-                Value = normalized
-            };
-
-            _dbContext.Categories.Add(category);
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            return category;
-        }
-       
-        private async Task<PersistenceItemRating> GetOrCreateItemRatingAsync(string itemValue, CancellationToken cancellationToken)
-        {
-            var normalized = itemValue.Trim();
-
-            var itemRating = await _dbContext.ItemRatings
-                .AsTracking()
-                .FirstOrDefaultAsync(r => r.Value == normalized, cancellationToken)
-                .ConfigureAwait(false);
-
-            if (itemRating != null)
-            {
-                return itemRating;
-            }
-
-            itemRating = new PersistenceItemRating
-            {
-                Value = normalized,
-                TotalRating = 0,
-                RatingCount = 0
-            };
-
-            _dbContext.ItemRatings.Add(itemRating);
-            await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
-
-            return itemRating;
         }
     }
 }

@@ -27,7 +27,7 @@ namespace WhatTheDob.Infrastructure.Services.External
 
             try
             {
-                using var request = new HttpRequestMessage(hasFilters ? HttpMethod.Post : HttpMethod.Get, url);
+                var request = new HttpRequestMessage(hasFilters ? HttpMethod.Post : HttpMethod.Get, url);
 
                 if (hasFilters)
                 {

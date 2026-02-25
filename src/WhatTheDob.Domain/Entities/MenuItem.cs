@@ -14,7 +14,6 @@ namespace WhatTheDob.Domain.Entities
         public int TotalRating { get; set; }
         public int RatingCount { get; set; }
 
-        // Parameterized constructor
         public MenuItem(string value, List<string> tags, string category, int totalRating, int ratingCount)
         {
             Value = value;
@@ -24,7 +23,6 @@ namespace WhatTheDob.Domain.Entities
             RatingCount = ratingCount;
         }
 
-        // Default constructor
         public MenuItem() : this(string.Empty, new List<string>(), string.Empty, 0, 0)
         {
         }

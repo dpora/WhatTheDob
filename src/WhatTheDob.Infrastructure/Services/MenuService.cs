@@ -21,7 +21,7 @@ namespace WhatTheDob.Infrastructure.Services
     /// </summary>
     public class MenuService : IMenuService
     {
-        private readonly WhatTheDob.Application.Interfaces.Services.IRatingThrottleService _throttleService;
+        private readonly IRatingThrottleService _throttleService;
         private readonly int _daysToFetch;
         private readonly string[] _meals;
         private readonly string _menuApiUrl;
@@ -39,7 +39,7 @@ namespace WhatTheDob.Infrastructure.Services
             IMenuItemMapper menuParser,
             IMenuFilterMapper menuFilterMapper,
             ILogger<MenuService> logger,
-            WhatTheDob.Application.Interfaces.Services.IRatingThrottleService throttleService)
+            IRatingThrottleService throttleService)
         {
             var fetchSettings = configuration.GetSection("MenuFetch");
 

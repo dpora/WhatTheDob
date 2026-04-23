@@ -79,7 +79,7 @@ builder.Services.AddHttpClient<IMenuApiClient, MenuApiClient>();
 builder.Services.AddSingleton<IDailyMenuJob, DailyMenuJob>();
 // Rating throttle to limit submissions per session id
 builder.Services.AddMemoryCache();
-builder.Services.AddSingleton<WhatTheDob.Application.Interfaces.Services.IRatingThrottleService, WhatTheDob.Infrastructure.Services.RatingThrottleService>();
+builder.Services.AddSingleton<IRatingThrottleService, RatingThrottleService>();
 
 var app = builder.Build();
 

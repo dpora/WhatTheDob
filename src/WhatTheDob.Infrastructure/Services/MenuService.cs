@@ -21,6 +21,7 @@ namespace WhatTheDob.Infrastructure.Services
     /// </summary>
     public class MenuService : IMenuService
     {
+        private readonly WhatTheDob.Application.Interfaces.Services.IRatingThrottleService _throttleService;
         private readonly int _daysToFetch;
         private readonly string[] _meals;
         private readonly string _menuApiUrl;
@@ -37,7 +38,8 @@ namespace WhatTheDob.Infrastructure.Services
             IMenuRepository menuRepository,
             IMenuItemMapper menuParser,
             IMenuFilterMapper menuFilterMapper,
-            ILogger<MenuService> logger)
+            ILogger<MenuService> logger,
+            WhatTheDob.Application.Interfaces.Services.IRatingThrottleService throttleService)
         {
             var fetchSettings = configuration.GetSection("MenuFetch");
 
@@ -51,6 +53,7 @@ namespace WhatTheDob.Infrastructure.Services
             _menuParser = menuParser;
             _menuFilterMapper = menuFilterMapper;
             _logger = logger;
+            _throttleService = throttleService;
             
             _logger.LogInformation("MenuService initialized with DaysToFetch={DaysToFetch}, SelectedCampus={CampusId}, MenuApiUrl={MenuApiUrl}", 
                 _daysToFetch, _campusId, _menuApiUrl);
@@ -250,6 +253,13 @@ namespace WhatTheDob.Infrastructure.Services
             {
                 _logger.LogWarning("Rating submission failed: Rating {Rating} is out of range (1-5)", rating);
                 throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
+            }
+
+            // Throttle check: allow maximum submissions per session per minute
+            if (!_throttleService.IsAllowedAndRecord(trimmedSessionId))
+            {
+                _logger.LogWarning("Rating submission throttled for SessionId={SessionId}", trimmedSessionId);
+                throw new InvalidOperationException("Rate limit exceeded. Please wait before submitting more ratings.");
             }
 
             await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);

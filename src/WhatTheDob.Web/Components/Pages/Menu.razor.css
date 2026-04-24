@@ -61,9 +61,6 @@
 .rate-limit-banner {
     margin-bottom: 1rem;
     padding: 0.85rem 1rem;
-    border: 3px solid #000000;
-    border-radius: 10px;
-    box-shadow: 5px 5px #000000;
     background: linear-gradient(110deg, #ffe6a7 0%, #ffd166 60%, #f9c74f 100%);
 }
 

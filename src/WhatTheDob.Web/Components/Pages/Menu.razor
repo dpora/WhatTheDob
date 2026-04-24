@@ -53,7 +53,7 @@ else
 {
     @if (_isRateLimitBannerVisible && !string.IsNullOrEmpty(_ratingErrorMessage))
     {
-        <div class="rate-limit-banner" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="rate-limit-banner card-style-md" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="rate-limit-banner-message">@_ratingErrorMessage</div>
             <div class="rate-limit-banner-meta">Try again in about @Math.Ceiling((_rateLimitCooldownPercent / 100d) * 60d) seconds.</div>
             <div class="rate-limit-cooldown-track">

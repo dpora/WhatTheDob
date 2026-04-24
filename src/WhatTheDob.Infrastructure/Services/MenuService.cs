@@ -168,7 +168,7 @@ namespace WhatTheDob.Infrastructure.Services
         }
 
         // GetMenuAsync retrieves a menu for a specific date, campus, and meal from the repository and maps it to the domain entity.
-        public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
+        public async Task<Menu?> GetMenuAsync(string date, int campusId, int mealId)
         {
             _logger.LogInformation("Retrieving menu for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
                 date, campusId, mealId);

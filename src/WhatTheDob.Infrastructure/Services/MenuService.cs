@@ -228,7 +228,7 @@ namespace WhatTheDob.Infrastructure.Services
             });
         }
 
-        public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
+        public async Task<(bool IsSuccess, string? FailureReason)> SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
         {
             _logger.LogInformation("Submitting user rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
                 sessionId, itemValue, rating);
@@ -240,31 +240,41 @@ namespace WhatTheDob.Infrastructure.Services
             if (string.IsNullOrWhiteSpace(trimmedSessionId))
             {
                 _logger.LogWarning("Rating submission failed: Session ID is empty");
-                throw new ArgumentException("Session id is required.", nameof(trimmedSessionId));
+                return (false, "Session id is required.");
             }
 
             if (string.IsNullOrWhiteSpace(trimmedItemValue))
             {
                 _logger.LogWarning("Rating submission failed: Item value is empty");
-                throw new ArgumentException("Item value is required.", nameof(trimmedItemValue));
+                return (false, "Item value is required.");
             }
 
             if (rating < 1 || rating > 5)
             {
                 _logger.LogWarning("Rating submission failed: Rating {Rating} is out of range (1-5)", rating);
-                throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
+                return (false, "Rating must be between 1 and 5.");
             }
 
             // Throttle check: allow maximum submissions per session per minute
             if (!_throttleService.IsAllowedAndRecord(trimmedSessionId))
             {
                 _logger.LogWarning("Rating submission throttled for SessionId={SessionId}", trimmedSessionId);
-                throw new InvalidOperationException("Rate limit exceeded. Please wait before submitting more ratings.");
+                return (false, "Rate limit exceeded. Please wait before submitting more ratings.");
             }
 
-            await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
-            _logger.LogInformation("User rating successfully submitted: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
-                trimmedSessionId, trimmedItemValue, rating);
+            try
+            {
+                await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
+                _logger.LogInformation("User rating successfully submitted: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                    trimmedSessionId, trimmedItemValue, rating);
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Rating submission failed in repository for SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}",
+                    trimmedSessionId, trimmedItemValue, rating);
+                return (false, "Failed to submit rating. Please try again.");
+            }
         }
     }
 }

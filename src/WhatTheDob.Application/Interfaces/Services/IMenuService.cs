@@ -14,6 +14,6 @@ namespace WhatTheDob.Application.Interfaces.Services
         Task<List<Menu>> FetchMenusFromApiAsync(string date = "");
         Task<IEnumerable<Campus>> GetCampusesAsync();
         Task<IEnumerable<Meal>> GetMealsAsync();
-        Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating);
+        Task<(bool IsSuccess, string? FailureReason)> SubmitUserRatingAsync(string sessionId, string itemValue, int rating);
     }
 }

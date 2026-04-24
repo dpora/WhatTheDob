@@ -157,7 +157,15 @@ namespace WhatTheDob.Web.Components.Pages
                 Logger.LogInformation("Submitting rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}",
                     _sessionId, itemValue, rating);
 
-                await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
+                var (isSuccess, failureReason) = await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
+
+                if (!isSuccess)
+                {
+                    _errorMessage = failureReason ?? "Failed to submit rating. Please try again.";
+                    Logger.LogWarning("Rating submission rejected: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}, Reason={Reason}",
+                        _sessionId, itemValue, rating, _errorMessage);
+                    return;
+                }
 
                 _userRatings[itemValue] = rating;
                 await SaveUserRatingToCookiesAsync(itemValue, rating);

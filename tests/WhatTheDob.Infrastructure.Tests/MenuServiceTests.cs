@@ -5,6 +5,7 @@ using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
+using WhatTheDob.Application.Interfaces.Services;
 using WhatTheDob.Application.Interfaces.Services.External;
 using WhatTheDob.Domain.Entities;
 using WhatTheDob.Infrastructure.Interfaces.Mapping;
@@ -17,7 +18,10 @@ namespace WhatTheDob.Infrastructure.Tests;
 
 public class MenuServiceTests
 {
-    private static MenuService CreateService(IMenuRepository repository, ILogger<MenuService>? logger = null)
+    private static MenuService CreateService(
+        IMenuRepository repository,
+        ILogger<MenuService>? logger = null,
+        IRatingThrottleService? throttleService = null)
     {
         var configuration = new ConfigurationBuilder().AddInMemoryCollection(new Dictionary<string, string?>
         {
@@ -26,13 +30,16 @@ public class MenuServiceTests
             ["MenuFetch:SelectedCampus"] = "1"
         }).Build();
 
+        throttleService ??= Mock.Of<IRatingThrottleService>(s => s.IsAllowedAndRecord(It.IsAny<string>()) == true);
+
         return new MenuService(
             configuration,
             Mock.Of<IMenuApiClient>(),
             repository,
             Mock.Of<IMenuItemMapper>(),
             Mock.Of<IMenuFilterMapper>(),
-            logger ?? Mock.Of<ILogger<MenuService>>());
+            logger ?? Mock.Of<ILogger<MenuService>>(),
+            throttleService);
     }
 
     [Theory]
@@ -43,9 +50,10 @@ public class MenuServiceTests
         var repoMock = new Mock<IMenuRepository>(MockBehavior.Strict);
         var service = CreateService(repoMock.Object);
 
-        var act = async () => await service.SubmitUserRatingAsync(session!, "Item", 3);
+        var result = await service.SubmitUserRatingAsync(session!, "Item", 3);
 
-        await act.Should().ThrowAsync<System.ArgumentException>();
+        result.IsSuccess.Should().BeFalse();
+        result.FailureReason.Should().Be("Session id is required.");
         repoMock.VerifyNoOtherCalls();
     }
 
@@ -57,9 +65,10 @@ public class MenuServiceTests
         var repoMock = new Mock<IMenuRepository>(MockBehavior.Strict);
         var service = CreateService(repoMock.Object);
 
-        var act = async () => await service.SubmitUserRatingAsync("session", item!, 3);
+        var result = await service.SubmitUserRatingAsync("session", item!, 3);
 
-        await act.Should().ThrowAsync<System.ArgumentException>();
+        result.IsSuccess.Should().BeFalse();
+        result.FailureReason.Should().Be("Item value is required.");
         repoMock.VerifyNoOtherCalls();
     }
 
@@ -71,10 +80,56 @@ public class MenuServiceTests
         var repoMock = new Mock<IMenuRepository>(MockBehavior.Strict);
         var service = CreateService(repoMock.Object);
 
-        var act = async () => await service.SubmitUserRatingAsync("session", "Item", rating);
+        var result = await service.SubmitUserRatingAsync("session", "Item", rating);
 
-        await act.Should().ThrowAsync<System.ArgumentOutOfRangeException>();
+        result.IsSuccess.Should().BeFalse();
+        result.FailureReason.Should().Be("Rating must be between 1 and 5.");
         repoMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SubmitUserRatingAsync_rejects_when_throttled()
+    {
+        var repoMock = new Mock<IMenuRepository>(MockBehavior.Strict);
+        var throttleMock = new Mock<IRatingThrottleService>();
+        throttleMock.Setup(t => t.IsAllowedAndRecord("session")).Returns(false);
+        var service = CreateService(repoMock.Object, throttleService: throttleMock.Object);
+
+        var result = await service.SubmitUserRatingAsync("session", "Item", 3);
+
+        result.IsSuccess.Should().BeFalse();
+        result.FailureReason.Should().Be("Rate limit exceeded. Please wait before submitting more ratings.");
+        repoMock.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public async Task SubmitUserRatingAsync_returns_success_for_valid_request()
+    {
+        var repoMock = new Mock<IMenuRepository>();
+        repoMock.Setup(r => r.UpsertUserRatingAsync("session", "Item", 5, default)).Returns(Task.CompletedTask);
+        var service = CreateService(repoMock.Object);
+
+        var result = await service.SubmitUserRatingAsync("session", "Item", 5);
+
+        result.IsSuccess.Should().BeTrue();
+        result.FailureReason.Should().BeNull();
+        repoMock.Verify(r => r.UpsertUserRatingAsync("session", "Item", 5, default), Times.Once);
+    }
+
+    [Fact]
+    public async Task SubmitUserRatingAsync_returns_failure_when_repository_throws()
+    {
+        var repoMock = new Mock<IMenuRepository>();
+        repoMock.Setup(r => r.UpsertUserRatingAsync("session", "Item", 4, default))
+            .ThrowsAsync(new System.Exception("db unavailable"));
+
+        var service = CreateService(repoMock.Object);
+
+        var result = await service.SubmitUserRatingAsync("session", "Item", 4);
+
+        result.IsSuccess.Should().BeFalse();
+        result.FailureReason.Should().Be("Failed to submit rating. Please try again.");
+        repoMock.Verify(r => r.UpsertUserRatingAsync("session", "Item", 4, default), Times.Once);
     }
 
     [Fact]

@@ -58,6 +58,43 @@
     box-shadow: 2px 2px #000000;
 }
 
+.rate-limit-banner {
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    border: 3px solid #000000;
+    border-radius: 10px;
+    box-shadow: 5px 5px #000000;
+    background: linear-gradient(110deg, #ffe6a7 0%, #ffd166 60%, #f9c74f 100%);
+}
+
+.rate-limit-banner-message {
+    font-weight: 700;
+    color: #2d1b00;
+    margin-bottom: 0.25rem;
+}
+
+.rate-limit-banner-meta {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #5f3a00;
+    margin-bottom: 0.45rem;
+}
+
+.rate-limit-cooldown-track {
+    width: 100%;
+    height: 0.5rem;
+    border: 2px solid #000000;
+    border-radius: 999px;
+    background-color: rgba(255, 255, 255, 0.55);
+    overflow: hidden;
+}
+
+.rate-limit-cooldown-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ef476f 0%, #f77f00 100%);
+    transition: width 0.15s linear;
+}
+
 .menu-metadata {
     margin-bottom: 2rem;
     padding: 1rem;

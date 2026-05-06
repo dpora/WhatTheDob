@@ -21,6 +21,7 @@ namespace WhatTheDob.Infrastructure.Services
     /// </summary>
     public class MenuService : IMenuService
     {
+        private readonly IRatingThrottleService _throttleService;
         private readonly int _daysToFetch;
         private readonly string[] _meals;
         private readonly string _menuApiUrl;
@@ -37,7 +38,8 @@ namespace WhatTheDob.Infrastructure.Services
             IMenuRepository menuRepository,
             IMenuItemMapper menuParser,
             IMenuFilterMapper menuFilterMapper,
-            ILogger<MenuService> logger)
+            ILogger<MenuService> logger,
+            IRatingThrottleService throttleService)
         {
             var fetchSettings = configuration.GetSection("MenuFetch");
 
@@ -51,6 +53,7 @@ namespace WhatTheDob.Infrastructure.Services
             _menuParser = menuParser;
             _menuFilterMapper = menuFilterMapper;
             _logger = logger;
+            _throttleService = throttleService;
             
             _logger.LogInformation("MenuService initialized with DaysToFetch={DaysToFetch}, SelectedCampus={CampusId}, MenuApiUrl={MenuApiUrl}", 
                 _daysToFetch, _campusId, _menuApiUrl);
@@ -165,7 +168,7 @@ namespace WhatTheDob.Infrastructure.Services
         }
 
         // GetMenuAsync retrieves a menu for a specific date, campus, and meal from the repository and maps it to the domain entity.
-        public async Task<Menu> GetMenuAsync(string date, int campusId, int mealId)
+        public async Task<Menu?> GetMenuAsync(string date, int campusId, int mealId)
         {
             _logger.LogInformation("Retrieving menu for Date={Date}, CampusId={CampusId}, MealId={MealId}", 
                 date, campusId, mealId);
@@ -225,7 +228,7 @@ namespace WhatTheDob.Infrastructure.Services
             });
         }
 
-        public async Task SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
+        public async Task<(bool IsSuccess, string? FailureReason)> SubmitUserRatingAsync(string sessionId, string itemValue, int rating)
         {
             _logger.LogInformation("Submitting user rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
                 sessionId, itemValue, rating);
@@ -237,24 +240,41 @@ namespace WhatTheDob.Infrastructure.Services
             if (string.IsNullOrWhiteSpace(trimmedSessionId))
             {
                 _logger.LogWarning("Rating submission failed: Session ID is empty");
-                throw new ArgumentException("Session id is required.", nameof(trimmedSessionId));
+                return (false, "Session id is required.");
             }
 
             if (string.IsNullOrWhiteSpace(trimmedItemValue))
             {
                 _logger.LogWarning("Rating submission failed: Item value is empty");
-                throw new ArgumentException("Item value is required.", nameof(trimmedItemValue));
+                return (false, "Item value is required.");
             }
 
             if (rating < 1 || rating > 5)
             {
                 _logger.LogWarning("Rating submission failed: Rating {Rating} is out of range (1-5)", rating);
-                throw new ArgumentOutOfRangeException(nameof(rating), rating, "Rating must be between 1 and 5.");
+                return (false, "Rating must be between 1 and 5.");
             }
 
-            await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
-            _logger.LogInformation("User rating successfully submitted: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
-                trimmedSessionId, trimmedItemValue, rating);
+            // Throttle check: allow maximum submissions per session per minute
+            if (!_throttleService.IsAllowedAndRecord(trimmedSessionId))
+            {
+                _logger.LogWarning("Rating submission throttled for SessionId={SessionId}", trimmedSessionId);
+                return (false, "Rate limit exceeded. Please wait before submitting more ratings.");
+            }
+
+            try
+            {
+                await _menuRepository.UpsertUserRatingAsync(trimmedSessionId, trimmedItemValue, rating).ConfigureAwait(false);
+                _logger.LogInformation("User rating successfully submitted: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}", 
+                    trimmedSessionId, trimmedItemValue, rating);
+                return (true, null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Rating submission failed in repository for SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}",
+                    trimmedSessionId, trimmedItemValue, rating);
+                return (false, "Failed to submit rating. Please try again.");
+            }
         }
     }
 }

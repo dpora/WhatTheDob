@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Http;
@@ -34,7 +35,14 @@ namespace WhatTheDob.Web.Components.Pages
         private bool _isLoading;
         private bool _isLoadingFilters = true;
         private bool _isSubmittingRating;
-        private string? _errorMessage;
+        private string? _menuErrorMessage;
+        private string? _ratingErrorMessage;
+        private bool _isRateLimitBannerVisible;
+        private double _rateLimitCooldownPercent;
+        private CancellationTokenSource? _rateLimitCooldownCts;
+
+        private const int RateLimitCooldownSeconds = 60;
+        private const int RateLimitTickMilliseconds = 200;
 
         private List<Campus> _campuses = new();
         private List<Meal> _meals = new();
@@ -83,7 +91,7 @@ namespace WhatTheDob.Web.Components.Pages
             catch (Exception ex)
             {
                 Logger.LogError(ex, "Failed to load filters in Menu page initialization");
-                _errorMessage = "Failed to load filters. Please refresh the page.";
+                _menuErrorMessage = "Failed to load filters. Please refresh the page.";
             }
             finally
             {
@@ -95,7 +103,7 @@ namespace WhatTheDob.Web.Components.Pages
         {
             if (!_selectedCampusId.HasValue || !_selectedMealId.HasValue)
             {
-                _errorMessage = "Please select both a campus and a meal.";
+                _menuErrorMessage = "Please select both a campus and a meal.";
                 Logger.LogWarning("Menu load attempted without valid selections: CampusId={CampusId}, MealId={MealId}",
                     _selectedCampusId, _selectedMealId);
                 StateHasChanged();
@@ -103,7 +111,7 @@ namespace WhatTheDob.Web.Components.Pages
             }
 
             _isLoading = true;
-            _errorMessage = null;
+            _menuErrorMessage = null;
             StateHasChanged();
 
             try
@@ -116,7 +124,7 @@ namespace WhatTheDob.Web.Components.Pages
 
                 if (_menu is null)
                 {
-                    _errorMessage = "No menu found for the selected date, campus, and meal.";
+                    _menuErrorMessage = "No menu found for the selected date, campus, and meal.";
                     Logger.LogInformation("No menu found for Date={Date}, CampusId={CampusId}, MealId={MealId}",
                         formattedDate, _selectedCampusId.Value, _selectedMealId.Value);
                 }
@@ -130,7 +138,7 @@ namespace WhatTheDob.Web.Components.Pages
             {
                 Logger.LogError(ex, "Failed to load menu for Date={Date}, CampusId={CampusId}, MealId={MealId}",
                     _selectedDate.ToString("MM/dd/yy"), _selectedCampusId.Value, _selectedMealId.Value);
-                _errorMessage = "Failed to load menu. Please try again.";
+                _menuErrorMessage = "Failed to load menu. Please try again.";
             }
             finally
             {
@@ -143,10 +151,15 @@ namespace WhatTheDob.Web.Components.Pages
         {
             if (string.IsNullOrEmpty(_sessionId))
             {
-                _errorMessage = "Session ID not found. Please refresh the page.";
+                _ratingErrorMessage = "Session ID not found. Please refresh the page.";
                 Logger.LogWarning("Rating submission attempted without session ID for ItemValue={ItemValue}", itemValue);
                 StateHasChanged();
                 return;
+            }
+
+            if (!_isRateLimitBannerVisible)
+            {
+                _ratingErrorMessage = null;
             }
 
             _isSubmittingRating = true;
@@ -157,7 +170,23 @@ namespace WhatTheDob.Web.Components.Pages
                 Logger.LogInformation("Submitting rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}",
                     _sessionId, itemValue, rating);
 
-                await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
+                var (isSuccess, failureReason) = await MenuService.SubmitUserRatingAsync(_sessionId, itemValue, rating);
+
+                if (!isSuccess)
+                {
+                    _ratingErrorMessage = failureReason ?? "Failed to submit rating. Please try again.";
+
+                    if (IsRateLimitFailure(_ratingErrorMessage))
+                    {
+                        ShowRateLimitBanner(_ratingErrorMessage);
+                    }
+
+                    Logger.LogWarning("Rating submission rejected: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}, Reason={Reason}",
+                        _sessionId, itemValue, rating, _ratingErrorMessage);
+                    return;
+                }
+
+                _ratingErrorMessage = null;
 
                 _userRatings[itemValue] = rating;
                 await SaveUserRatingToCookiesAsync(itemValue, rating);
@@ -176,13 +205,77 @@ namespace WhatTheDob.Web.Components.Pages
             {
                 Logger.LogError(ex, "Failed to submit rating: SessionId={SessionId}, ItemValue={ItemValue}, Rating={Rating}",
                     _sessionId, itemValue, rating);
-                _errorMessage = "Failed to submit rating. Please try again.";
+                _ratingErrorMessage = "Failed to submit rating. Please try again.";
             }
             finally
             {
                 _isSubmittingRating = false;
                 StateHasChanged();
             }
+        }
+
+        private static bool IsRateLimitFailure(string? failureReason)
+        {
+            return !string.IsNullOrWhiteSpace(failureReason)
+                && failureReason.Contains("rate limit", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void ShowRateLimitBanner(string message)
+        {
+            _ratingErrorMessage = message;
+            _isRateLimitBannerVisible = true;
+            _rateLimitCooldownPercent = 100;
+
+            _rateLimitCooldownCts?.Cancel();
+            _rateLimitCooldownCts?.Dispose();
+
+            _rateLimitCooldownCts = new CancellationTokenSource();
+            _ = RunRateLimitCooldownAsync(_rateLimitCooldownCts.Token);
+        }
+
+        private async Task RunRateLimitCooldownAsync(CancellationToken cancellationToken)
+        {
+            var cooldownStart = DateTime.UtcNow;
+            var cooldownDuration = TimeSpan.FromSeconds(RateLimitCooldownSeconds);
+
+            try
+            {
+                while (!cancellationToken.IsCancellationRequested)
+                {
+                    var elapsed = DateTime.UtcNow - cooldownStart;
+                    if (elapsed >= cooldownDuration)
+                    {
+                        break;
+                    }
+
+                    var remaining = cooldownDuration - elapsed;
+                    _rateLimitCooldownPercent = Math.Clamp((remaining.TotalMilliseconds / cooldownDuration.TotalMilliseconds) * 100d, 0d, 100d);
+
+                    await InvokeAsync(StateHasChanged);
+                    await Task.Delay(RateLimitTickMilliseconds, cancellationToken);
+                }
+            }
+            catch (TaskCanceledException)
+            {
+                return;
+            }
+
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return;
+            }
+
+            _isRateLimitBannerVisible = false;
+            _ratingErrorMessage = null;
+            _rateLimitCooldownPercent = 0;
+
+            await InvokeAsync(StateHasChanged);
+        }
+
+        public void Dispose()
+        {
+            _rateLimitCooldownCts?.Cancel();
+            _rateLimitCooldownCts?.Dispose();
         }
 
         private double GetDisplayRating(MenuItem item)

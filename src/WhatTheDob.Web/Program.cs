@@ -77,6 +77,9 @@ builder.Services.AddScoped<IMenuItemMapper, MenuItemMapper>();
 builder.Services.AddScoped<IMenuFilterMapper, MenuFilterMapper>();
 builder.Services.AddHttpClient<IMenuApiClient, MenuApiClient>();
 builder.Services.AddSingleton<IDailyMenuJob, DailyMenuJob>();
+// Rating throttle to limit submissions per session id
+builder.Services.AddMemoryCache();
+builder.Services.AddSingleton<IRatingThrottleService, RatingThrottleService>();
 
 var app = builder.Build();
 
